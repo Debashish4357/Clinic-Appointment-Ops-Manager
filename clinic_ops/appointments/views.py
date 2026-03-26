@@ -16,7 +16,7 @@ class AppointmentView(APIView):
         user = request.user
         role = user.role
 
-        if role == 'ADMIN':
+        if role in ['ADMIN', 'RECEPTIONIST']:
             appointments = Appointment.objects.all()
         elif role == 'DOCTOR':
             try:
@@ -33,8 +33,20 @@ class AppointmentView(APIView):
         else:
             return Response({'error': 'Unauthorized role.'}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = AppointmentSerializer(appointments, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Structure response to return exactly the required fields
+        data = [
+            {
+                "doctor": appt.doctor.id,
+                "patient": appt.patient.id,
+                "date": appt.date,
+                "time": appt.time,
+                "token_number": appt.token_number,
+                "estimated_wait_time": appt.estimated_wait_time,
+                "status": appt.status
+            }
+            for appt in appointments
+        ]
+        return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request):
         doctor_id = request.data.get('doctor')
@@ -205,8 +217,8 @@ class DoctorDashboardView(APIView):
         total_earnings = today_appointments.filter(status=Appointment.Status.COMPLETED).aggregate(total=Sum('fee'))['total'] or 0.00
 
         data = {
-            'appointments': AppointmentSerializer(today_appointments, many=True).data,
-            'total_patients_handled_today': total_handled,
+            'todays_appointments': AppointmentSerializer(today_appointments, many=True).data,
+            'total_patients_today': total_handled,
             'total_earnings': total_earnings
         }
         return Response(data, status=status.HTTP_200_OK)
@@ -223,12 +235,9 @@ class ReceptionistDashboardView(APIView):
         today_appointments = Appointment.objects.filter(date=today)
         
         total_bookings_today = today_appointments.count()
-        available_slots = max(0, 100 - total_bookings_today)  # simple logic wrapper
-
         data = {
-            'appointments': AppointmentSerializer(today_appointments, many=True).data,
-            'total_bookings_today': total_bookings_today,
-            'available_slots': available_slots
+            'todays_appointments': AppointmentSerializer(today_appointments, many=True).data,
+            'total_bookings_today': total_bookings_today
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -249,9 +258,19 @@ class PatientDashboardView(APIView):
         upcoming = appointments.filter(date__gte=date.today(), status=Appointment.Status.BOOKED).first()
 
         data = {
-            'appointments': AppointmentSerializer(appointments, many=True).data,
+            'patients_appointments': AppointmentSerializer(appointments, many=True).data,
             'upcoming_appointment': AppointmentSerializer(upcoming).data if upcoming else None,
             'token_number': upcoming.token_number if upcoming else None,
             'estimated_wait_time': upcoming.estimated_wait_time if upcoming else None
         }
         return Response(data, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
