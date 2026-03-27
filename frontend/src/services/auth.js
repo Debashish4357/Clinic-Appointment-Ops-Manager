@@ -1,38 +1,29 @@
 import api from './api';
 
-export const login = async (credentials) => {
-  try {
-    const response = await api.post('/auth/login', credentials);
-    const { token, user } = response.data;
-    
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    return { success: true, user };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error.response?.data?.message || 'Login failed' 
-    };
+export const loginUser = async (data) => {
+  const response = await api.post('/token/', data);
+  if (response.data && response.data.access) {
+    localStorage.setItem('access_token', response.data.access);
+    localStorage.setItem('role', response.data.role || 'PATIENT');
   }
+  return response.data;
 };
 
-export const logout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+export const registerUser = async (data) => {
+  const response = await api.post('/register/', data);
+  return response.data;
+};
+
+export const logoutUser = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('role');
   window.location.href = '/login';
 };
 
-export const getCurrentUser = () => {
-  const user = localStorage.getItem('user');
-  return user ? JSON.parse(user) : null;
-};
-
 export const isAuthenticated = () => {
-  const token = localStorage.getItem('token');
-  return !!token;
+  return !!localStorage.getItem('access_token');
 };
 
-export const getToken = () => {
-  return localStorage.getItem('token');
+export const getUserRole = () => {
+  return localStorage.getItem('role');
 };

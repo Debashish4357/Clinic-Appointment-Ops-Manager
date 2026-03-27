@@ -40,7 +40,7 @@ const PatientDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Appointments</h3>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{data.appointments?.length || 0}</p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">{data.patients_appointments?.length || 0}</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow">
@@ -60,9 +60,9 @@ const PatientDashboard = () => {
 
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Appointments</h3>
-        {data.appointments?.length > 0 ? (
+        {data.patients_appointments?.length > 0 ? (
           <div className="space-y-3">
-            {data.appointments.map((appointment, index) => (
+            {data.patients_appointments.map((appointment, index) => (
               <div key={index} className="flex justify-between items-center p-4 border rounded">
                 <div>
                   <p className="font-medium">{appointment.doctor_name || 'Doctor'}</p>
