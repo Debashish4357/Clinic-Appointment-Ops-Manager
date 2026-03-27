@@ -5,6 +5,3 @@ The project is a backend-centric operational management system for clinics. It i
 
 
 
-python manage.py makemigrations
-python manage.py migrate
-python manage.py runserver
