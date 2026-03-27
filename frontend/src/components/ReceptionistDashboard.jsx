@@ -44,7 +44,7 @@ const ReceptionistDashboard = () => {
 
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Total Appointments</h3>
-          <p className="text-2xl font-bold text-green-600 mt-2">{data.appointments?.length || 0}</p>
+          <p className="text-2xl font-bold text-green-600 mt-2">{data.todays_appointments?.length || 0}</p>
         </div>
       </div>
 
@@ -53,7 +53,7 @@ const ReceptionistDashboard = () => {
           <h3 className="text-lg font-semibold text-gray-700">Appointment List</h3>
         </div>
         
-        {data.appointments?.length > 0 ? (
+        {data.todays_appointments?.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-50">
@@ -76,7 +76,7 @@ const ReceptionistDashboard = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {data.appointments.map((appointment, index) => (
+                {data.todays_appointments.map((appointment, index) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {appointment.patient_name || 'N/A'}
