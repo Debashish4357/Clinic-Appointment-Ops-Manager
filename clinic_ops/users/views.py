@@ -28,26 +28,32 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def register_user(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
-    role = request.data.get('role', User.Role.PATIENT)
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth.hashers import make_password
+from users.models import User, Patient, Doctor
 
-    if not username or not password:
-        return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+class RegisterView(APIView):
+    permission_classes = [] # Allow unauthenticated
 
-    try:
-        user = User.objects.create_user(username=username, password=password, role=role)
-        
-        if role == User.Role.DOCTOR:
-            Doctor.objects.create(user=user)
-        elif role == User.Role.PATIENT:
+    def post(self, request):
+        data = request.data
+        if User.objects.filter(username=data.get('username')).exists():
+            return Response({'detail': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create user
+        user = User.objects.create(
+            username=data.get('username'),
+            email=data.get('email', ''),
+            role=data.get('role', 'PATIENT'),
+            password=make_password(data.get('password'))
+        )
+
+        # Map correct role profiles
+        if user.role == 'PATIENT':
             Patient.objects.create(user=user)
-            
-        return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
-    except IntegrityError:
-        return Response({'error': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        elif user.role == 'DOCTOR':
+            Doctor.objects.create(user=user)
+
+        return Response({'detail': 'User registered successfully'}, status=status.HTTP_201_CREATED)

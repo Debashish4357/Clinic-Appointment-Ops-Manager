@@ -1,29 +1,11 @@
-import api from './api';
+import API from './api';
 
-export const loginUser = async (data) => {
-  const response = await api.post('/token/', data);
-  if (response.data && response.data.access) {
-    localStorage.setItem('access_token', response.data.access);
-    localStorage.setItem('role', response.data.role || 'PATIENT');
-  }
+export const loginUser = async (credentials) => {
+  const response = await API.post('token/', credentials);
   return response.data;
 };
 
-export const registerUser = async (data) => {
-  const response = await api.post('/register/', data);
+export const registerUser = async (userData) => {
+  const response = await API.post('register/', userData);
   return response.data;
-};
-
-export const logoutUser = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('role');
-  window.location.href = '/login';
-};
-
-export const isAuthenticated = () => {
-  return !!localStorage.getItem('access_token');
-};
-
-export const getUserRole = () => {
-  return localStorage.getItem('role');
 };

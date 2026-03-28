@@ -13,6 +13,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/appointments" element={isAuthenticated() ? <Appointments /> : <Navigate to="/login" replace />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={isAuthenticated() ? <Dashboard /> : <Navigate to="/login" replace />} />
           <Route path="/appointments" element={<Appointments />} />
