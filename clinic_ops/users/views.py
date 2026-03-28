@@ -20,3 +20,34 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth.hashers import make_password
+from users.models import User, Patient, Doctor
+
+class RegisterView(APIView):
+    permission_classes = [] # Allow unauthenticated
+
+    def post(self, request):
+        data = request.data
+        if User.objects.filter(username=data.get('username')).exists():
+            return Response({'detail': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create user
+        user = User.objects.create(
+            username=data.get('username'),
+            email=data.get('email', ''),
+            role=data.get('role', 'PATIENT'),
+            password=make_password(data.get('password'))
+        )
+
+        # Map correct role profiles
+        if user.role == 'PATIENT':
+            Patient.objects.create(user=user)
+        elif user.role == 'DOCTOR':
+            Doctor.objects.create(user=user)
+
+        return Response({'detail': 'User registered successfully'}, status=status.HTTP_201_CREATED)

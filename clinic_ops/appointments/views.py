@@ -33,20 +33,8 @@ class AppointmentView(APIView):
         else:
             return Response({'error': 'Unauthorized role.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Structure response to return exactly the required fields
-        data = [
-            {
-                "doctor": appt.doctor.id,
-                "patient": appt.patient.id,
-                "date": appt.date,
-                "time": appt.time,
-                "token_number": appt.token_number,
-                "estimated_wait_time": appt.estimated_wait_time,
-                "status": appt.status
-            }
-            for appt in appointments
-        ]
-        return Response(data, status=status.HTTP_200_OK)
+        serializer = AppointmentSerializer(appointments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
         doctor_id = request.data.get('doctor')

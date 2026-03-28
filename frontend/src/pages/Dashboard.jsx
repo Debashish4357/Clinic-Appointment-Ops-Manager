@@ -1,41 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AdminDashboard from '../components/AdminDashboard';
 import DoctorDashboard from '../components/DoctorDashboard';
-import ReceptionistDashboard from '../components/ReceptionistDashboard';
 import PatientDashboard from '../components/PatientDashboard';
+import ReceptionistDashboard from '../components/ReceptionistDashboard';
 
-const Dashboard = () => {
-  const role = localStorage.getItem('role');
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    // Dummy check for role from local storage/token
+    const userRole = localStorage.getItem('role');
+    if (!userRole) {
+      navigate('/');
+    } else {
+      setRole(userRole);
+    }
+  }, [navigate]);
 
   const renderDashboard = () => {
     switch (role) {
-      case 'ADMIN':
-        return <AdminDashboard />;
-      case 'DOCTOR':
-        return <DoctorDashboard />;
-      case 'RECEPTIONIST':
-        return <ReceptionistDashboard />;
-      case 'PATIENT':
-        return <PatientDashboard />;
-      default:
-        return (
-          <div className="min-h-screen bg-gray-100">
-            <div className="container mx-auto px-4 py-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
-              <div className="bg-white p-6 rounded-lg shadow">
-                <p className="text-gray-600">Welcome! Your role is not recognized.</p>
-              </div>
-            </div>
-          </div>
-        );
+      case 'ADMIN': return <AdminDashboard />;
+      case 'DOCTOR': return <DoctorDashboard />;
+      case 'RECEPTIONIST': return <ReceptionistDashboard />;
+      case 'PATIENT': return <PatientDashboard />;
+      default: return <div>Loading...</div>;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {renderDashboard()}
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white shadow p-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-gray-800">Clinic Dashboard</h1>
+        <button className="text-red-500 hover:text-red-700" onClick={() => { localStorage.clear(); navigate('/'); }}>Logout</button>
+      </header>
+      <main className="flex-1 p-6">
+        {renderDashboard()}
+      </main>
     </div>
   );
-};
-
-export default Dashboard;
+}

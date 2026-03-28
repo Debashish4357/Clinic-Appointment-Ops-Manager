@@ -40,6 +40,7 @@ INSTALLED_APPS = [
 
     # Third-party
     'rest_framework',
+    'corsheaders',
 
     # Your apps
     'users',
@@ -50,6 +51,7 @@ AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -130,3 +132,11 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=14),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+}
+
+CORS_ALLOW_ALL_ORIGINS = True
