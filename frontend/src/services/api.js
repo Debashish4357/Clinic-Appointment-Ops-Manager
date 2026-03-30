@@ -1,15 +1,39 @@
-import axios from "axios";
+import axios from 'axios';
 
 const API = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
+  baseURL: 'http://127.0.0.1:8000/api/',
 });
 
-API.interceptors.request.use((req) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
+// Attach JWT token to every request
+API.interceptors.request.use(
+  (req) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      req.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return req;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Handle 401 — token expired or invalid → force re-login
+// Skip redirect if no token existed (i.e. login attempt with bad credentials)
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Token was present but rejected → expired/revoked → clear & redirect
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user_id');
+        window.location.href = '/';
+      }
+      // If no token, the user is on login page → let the error reach catch()
+    }
+    return Promise.reject(error);
   }
-  return req;
-});
+);
 
 export default API;

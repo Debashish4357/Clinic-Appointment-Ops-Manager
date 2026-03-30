@@ -1,120 +1,103 @@
 import React, { useEffect, useState } from 'react';
 import API from '../services/api';
 
+const STATUS_STYLES = {
+  BOOKED:    'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  COMPLETED: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+  CANCELLED: 'bg-red-500/20 text-red-300 border border-red-500/30',
+};
+
 export default function PatientDashboard() {
-  const [appointments, setAppointments] = useState([]);
-  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const response = await API.get('appointments/');
-        console.log("Appointments Data:", response.data);
-        setAppointments(response.data);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load appointments. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchAppointments();
+    API.get('dashboard/patient/')
+      .then((res) => setData(res.data.data || res.data))
+      .catch(() => setError('Failed to load your appointments.'))
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-gray-500 p-4">Loading your appointments...</div>;
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <svg className="animate-spin w-8 h-8" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-sm">Fetching your appointments...</p>
+        </div>
+      </div>
+    );
+
+  if (error)
+    return <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-6 text-center">{error}</div>;
+
+  const upcoming = data?.upcoming_appointment;
 
   return (
-    <div className="space-y-6">
-      {error && (
-        <div className="bg-red-50 text-red-700 p-4 rounded-md text-sm border border-red-200">
-          {error}
-    <div className="p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Patient Dashboard</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Appointments</h3>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{data.patients_appointments?.length || 0}</p>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-2xl font-black text-white">Patient Dashboard</h1>
+        <p className="text-slate-400 text-sm mt-1">Your upcoming appointment and history</p>
+      </div>
+
+      {/* Upcoming appointment highlight */}
+      {upcoming ? (
+        <div className="bg-gradient-to-r from-blue-600/30 to-cyan-600/20 border border-cyan-500/30 rounded-2xl p-6 mb-8">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <p className="text-cyan-300 text-xs font-bold uppercase tracking-widest mb-1">Next Appointment</p>
+              <p className="text-white font-bold text-lg">Doctor #{upcoming.doctor}</p>
+              <p className="text-slate-300 text-sm mt-1">{upcoming.date} at {upcoming.time}</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="text-center bg-white/10 rounded-xl px-5 py-3">
+                <p className="text-2xl font-black text-cyan-300">{data.token_number ?? '—'}</p>
+                <p className="text-slate-400 text-xs mt-1">Token #</p>
+              </div>
+              <div className="text-center bg-white/10 rounded-xl px-5 py-3">
+                <p className="text-2xl font-black text-amber-300">{data.estimated_wait_time ?? '—'}</p>
+                <p className="text-slate-400 text-xs mt-1">Min wait</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-slate-800/40 border border-white/10 rounded-2xl p-6 mb-8 text-center text-slate-400 text-sm">
+          No upcoming appointments. <a href="/appointments" className="text-cyan-400 hover:underline ml-1">Book one now →</a>
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-        <h3 className="text-xl font-bold text-gray-800 mb-6">My Appointments</h3>
-        
-        {appointments.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm text-gray-600">
-              <thead className="bg-gray-50 border-b border-gray-200 text-gray-700">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Doctor Profile</th>
-                  <th className="px-4 py-3 font-semibold">Date</th>
-                  <th className="px-4 py-3 font-semibold">Time</th>
-                  <th className="px-4 py-3 font-semibold">Token</th>
-                  <th className="px-4 py-3 font-semibold">Wait Time (m)</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {appointments.map((appt) => (
-                  <tr key={appt.id || appt.token_number} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">User #{appt.doctor}</td>
-                    <td className="px-4 py-3">{appt.date}</td>
-                    <td className="px-4 py-3">{appt.time}</td>
-                    <td className="px-4 py-3 font-bold text-gray-800">{appt.token_number}</td>
-                    <td className="px-4 py-3 text-orange-600 font-medium">{appt.estimated_wait_time} mins</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${appt.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {appt.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Token Number</h3>
-          <p className="text-2xl font-bold text-green-600 mt-2">
-            {data.token_number || 'N/A'}
-          </p>
+      {/* All Appointments */}
+      <div className="bg-slate-800/60 border border-white/10 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+          <h2 className="font-bold text-white">All Appointments</h2>
+          <span className="text-slate-400 text-sm">{data?.patients_appointments?.length ?? 0} total</span>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Wait Time</h3>
-          <p className="text-2xl font-bold text-purple-600 mt-2">
-            {data.wait_time ? `${data.wait_time} min` : 'N/A'}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Appointments</h3>
-        {data.patients_appointments?.length > 0 ? (
-          <div className="space-y-3">
-            {data.patients_appointments.map((appointment, index) => (
-              <div key={index} className="flex justify-between items-center p-4 border rounded">
-                <div>
-                  <p className="font-medium">{appointment.doctor_name || 'Doctor'}</p>
-                  <p className="text-sm text-gray-600">{appointment.date || 'Date'}</p>
-                  <p className="text-sm text-gray-500">{appointment.time || 'Time'}</p>
+        {data?.patients_appointments?.length > 0 ? (
+          <div className="divide-y divide-white/5">
+            {data.patients_appointments.map((appt, i) => (
+              <div key={i} className="flex items-center justify-between px-6 py-4 hover:bg-white/5 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="w-9 h-9 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-sm font-bold">
+                    {appt.token_number || i + 1}
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">Doctor #{appt.doctor}</p>
+                    <p className="text-slate-400 text-xs">{appt.date} · {appt.time}</p>
+                  </div>
                 </div>
-                <span className={`px-2 py-1 text-xs rounded ${
-                  appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                  appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                  appointment.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-blue-100 text-blue-800'
-                }`}>
-                  {appointment.status || 'Scheduled'}
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
+                  {appt.status}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="p-8 text-center bg-gray-50 rounded border border-dashed border-gray-300">
-            <p className="text-gray-500 font-medium text-lg mb-2">No appointments found</p>
-            <p className="text-sm text-gray-400">You don't have any past or upcoming appointments scheduled yet.</p>
-          </div>
+          <div className="px-6 py-12 text-center text-slate-500 text-sm">No appointment history found.</div>
         )}
       </div>
     </div>
