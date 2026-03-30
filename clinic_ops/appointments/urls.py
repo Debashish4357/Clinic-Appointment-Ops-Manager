@@ -1,15 +1,20 @@
 from django.urls import path
 from .views import (
-    AppointmentView, AppointmentDetailView,
+    AppointmentView, AppointmentDetailView, AppointmentMoveView,
     DailyPatientsView, RevenueView,
     AdminDashboardView, DoctorDashboardView,
-    ReceptionistDashboardView, PatientDashboardView
+    ReceptionistDashboardView, PatientDashboardView,
+    DoctorListView,
 )
 
 urlpatterns = [
+    # Doctors list (for booking dropdown)
+    path('doctors/', DoctorListView.as_view(), name='doctors_list'),
+
     # Appointments CRUD
     path('appointments/', AppointmentView.as_view(), name='appointments'),
     path('appointments/<int:pk>/', AppointmentDetailView.as_view(), name='appointment_detail'),
+    path('appointments/<int:pk>/move/', AppointmentMoveView.as_view(), name='appointment_move'),
 
     # Analytics
     path('analytics/daily-patients/', DailyPatientsView.as_view(), name='analytics_daily_patients'),

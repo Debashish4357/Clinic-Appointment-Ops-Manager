@@ -25,10 +25,19 @@ class Doctor(models.Model):
 
 
 class Patient(models.Model):
+    class Gender(models.TextChoices):
+        MALE = 'MALE', 'Male'
+        FEMALE = 'FEMALE', 'Female'
+        OTHER = 'OTHER', 'Other'
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient_profile')
     age = models.PositiveIntegerField(null=True, blank=True)
     contact = models.CharField(max_length=20, blank=True)
+    gender = models.CharField(max_length=10, choices=Gender.choices, blank=True)
     medical_history = models.TextField(blank=True)
-    
+    allergies = models.TextField(blank=True)
+    current_medication = models.TextField(blank=True)
+    profile_completed = models.BooleanField(default=False)
+
     def __str__(self):
         return self.user.get_full_name() or self.user.username

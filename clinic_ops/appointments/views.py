@@ -47,28 +47,47 @@ class AppointmentView(APIView):
 
     # ── POST /api/appointments/ ────────────────────────────────────────────────
     def post(self, request):
-        doctor_id = request.data.get('doctor')
-        patient_id = request.data.get('patient')
-        appt_date = request.data.get('date')
-        appt_time = request.data.get('time')
-
-        # Validate required fields
-        if not all([doctor_id, patient_id, appt_date, appt_time]):
+        # Only PATIENT role can book appointments
+        if request.user.role != 'PATIENT':
             return Response(
-                {'message': 'doctor, patient, date, and time are required.'},
+                {'message': 'Only patients can book appointments.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Resolve patient from the logged-in user
+        try:
+            patient = Patient.objects.get(user=request.user)
+        except Patient.DoesNotExist:
+            return Response(
+                {'message': 'Patient profile not found for this user.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if patient profile is completed
+        if not patient.profile_completed:
+            return Response(
+                {'message': 'Please complete your profile before booking.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Fetch doctor and patient
+        doctor_id        = request.data.get('doctor')
+        appt_date        = request.data.get('date')
+        appt_time        = request.data.get('time')
+        reason           = request.data.get('reason', '')
+        appointment_type = request.data.get('appointment_type', 'NORMAL')
+
+        # Validate required fields
+        if not all([doctor_id, appt_date, appt_time]):
+            return Response(
+                {'message': 'doctor, date, and time are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch doctor
         try:
             doctor = Doctor.objects.get(id=doctor_id)
         except Doctor.DoesNotExist:
             return Response({'message': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            patient = Patient.objects.get(id=patient_id)
-        except Patient.DoesNotExist:
-            return Response({'message': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Conflict detection — same doctor, date, and time
         if Appointment.objects.filter(doctor=doctor, date=appt_date, time=appt_time).exists():
@@ -78,8 +97,10 @@ class AppointmentView(APIView):
             )
 
         # Auto-generate token and wait time
-        appointments_today = Appointment.objects.filter(doctor=doctor, date=appt_date).count()
-        token_number = appointments_today + 1
+        appointments_today = Appointment.objects.filter(
+            doctor=doctor, date=appt_date
+        ).exclude(status='CANCELLED').count()
+        token_number       = appointments_today + 1
         estimated_wait_time = token_number * doctor.avg_consultation_time
 
         appointment = Appointment.objects.create(
@@ -89,7 +110,9 @@ class AppointmentView(APIView):
             time=appt_time,
             token_number=token_number,
             estimated_wait_time=estimated_wait_time,
-            fee=request.data.get('fee', doctor.consultation_fee),
+            fee=doctor.consultation_fee,
+            reason=reason,
+            appointment_type=appointment_type,
         )
 
         return Response({
@@ -100,9 +123,9 @@ class AppointmentView(APIView):
                 'estimated_wait_time': estimated_wait_time,
                 'date': appt_date,
                 'time': appt_time,
+                'doctor_name': str(doctor),
             }
         }, status=status.HTTP_201_CREATED)
-
 
 class AppointmentDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -122,7 +145,7 @@ class AppointmentDetailView(APIView):
             return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         # ── Guard: Terminal states cannot be changed ───────────────────────────
-        if appointment.status in ['COMPLETED', 'CANCELLED']:
+        if appointment.status in ['COMPLETED', 'CANCELLED', 'NO_SHOW']:
             return Response(
                 {'message': f'Cannot update an appointment that is already {appointment.status}.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -130,7 +153,7 @@ class AppointmentDetailView(APIView):
 
         new_status = request.data.get('status')
 
-        # ── DOCTOR: BOOKED → COMPLETED + optional medical fields ──────────────
+        # ── DOCTOR: BOOKED/ARRIVED → COMPLETED + optional medical fields ───────
         if role == 'DOCTOR':
             if new_status and new_status != 'COMPLETED':
                 return Response(
@@ -138,6 +161,11 @@ class AppointmentDetailView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
             if new_status == 'COMPLETED':
+                if appointment.status not in ['BOOKED', 'ARRIVED']:
+                    return Response(
+                        {'message': f'Cannot complete an appointment with status {appointment.status}.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 appointment.status = 'COMPLETED'
             # Update medical fields if provided
             if 'doctor_remark' in request.data:
@@ -147,18 +175,50 @@ class AppointmentDetailView(APIView):
             if 'advice' in request.data:
                 appointment.advice = request.data['advice']
 
-        # ── RECEPTIONIST: BOOKED → CANCELLED ──────────────────────────────────
+        # ── RECEPTIONIST: Check-In / Check-Out / Cancel ─────────────────────────
         elif role == 'RECEPTIONIST':
-            if not new_status or new_status != 'CANCELLED':
+            if not new_status:
                 return Response(
-                    {'message': 'Receptionist can only change status to CANCELLED.'},
+                    {'message': 'Status field is required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # BOOKED → ARRIVED (Check-In)
+            if new_status == 'ARRIVED':
+                if appointment.status != 'BOOKED':
+                    return Response(
+                        {'message': 'Can only check-in a BOOKED appointment.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                appointment.status = 'ARRIVED'
+
+            # ARRIVED → COMPLETED (Check-Out)
+            elif new_status == 'COMPLETED':
+                if appointment.status != 'ARRIVED':
+                    return Response(
+                        {'message': 'Can only check-out an ARRIVED appointment.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                appointment.status = 'COMPLETED'
+
+            # BOOKED → CANCELLED
+            elif new_status == 'CANCELLED':
+                if appointment.status != 'BOOKED':
+                    return Response(
+                        {'message': 'Can only cancel a BOOKED appointment.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                appointment.status = 'CANCELLED'
+
+            else:
+                return Response(
+                    {'message': 'Receptionist can set status to ARRIVED, COMPLETED, or CANCELLED.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            appointment.status = 'CANCELLED'
 
         # ── ADMIN: Any valid transition ────────────────────────────────────────
         elif role == 'ADMIN':
-            valid_statuses = ['BOOKED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
+            valid_statuses = ['BOOKED', 'ARRIVED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
             if new_status:
                 if new_status not in valid_statuses:
                     return Response(
@@ -206,6 +266,75 @@ class AppointmentDetailView(APIView):
 
         appointment.delete()
         return Response({'message': 'Appointment deleted successfully.'}, status=status.HTTP_200_OK)
+
+
+class AppointmentMoveView(APIView):
+    """PATCH /api/appointments/<id>/move/ — swap token_number up or down."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role not in ['RECEPTIONIST', 'ADMIN']:
+            return Response({'message': 'Only Receptionist or Admin can reorder the queue.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        action = request.data.get('action', '').upper()
+        if action not in ['UP', 'DOWN']:
+            return Response({'message': 'action must be UP or DOWN.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            current = Appointment.objects.get(pk=pk)
+        except Appointment.DoesNotExist:
+            return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Only reorder same doctor + same date queue
+        siblings = Appointment.objects.filter(
+            doctor=current.doctor, date=current.date
+        ).order_by('token_number')
+
+        if action == 'UP':
+            # Find the appointment right before this one
+            prev = siblings.filter(token_number__lt=current.token_number).order_by('-token_number').first()
+            if not prev:
+                return Response({'message': 'Already at the top of the queue.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            swap_target = prev
+        else:
+            # Find the appointment right after this one
+            nxt = siblings.filter(token_number__gt=current.token_number).order_by('token_number').first()
+            if not nxt:
+                return Response({'message': 'Already at the bottom of the queue.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            swap_target = nxt
+
+        # Swap token numbers
+        current.token_number, swap_target.token_number = swap_target.token_number, current.token_number
+        current.save(update_fields=['token_number'])
+        swap_target.save(update_fields=['token_number'])
+
+        return Response({
+            'message': f'Appointment moved {action.lower()} successfully.',
+        }, status=status.HTTP_200_OK)
+
+# ── DOCTORS LIST ───────────────────────────────────────────────────────────────
+
+class DoctorListView(APIView):
+    """GET /api/doctors/ — returns all doctors for the booking dropdown."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        doctors = Doctor.objects.select_related('user').all()
+        data = [
+            {
+                'id': doc.id,
+                'name': doc.user.get_full_name() or doc.user.username,
+                'specialization': doc.specialization or 'General',
+                'consultation_fee': str(doc.consultation_fee),
+                'avg_consultation_time': doc.avg_consultation_time,
+            }
+            for doc in doctors
+        ]
+        return Response({'message': 'Success', 'data': data}, status=status.HTTP_200_OK)
 
 
 # ── ANALYTICS ──────────────────────────────────────────────────────────────────
@@ -265,15 +394,48 @@ class DoctorDashboardView(APIView):
             return Response({'message': 'Doctor profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
         today = date.today()
-        today_appointments = Appointment.objects.filter(doctor=doctor, date=today)
-        total_earnings = today_appointments.filter(
-            status=Appointment.Status.COMPLETED
+        today_appointments = Appointment.objects.filter(
+            doctor=doctor, date=today
+        ).select_related('patient', 'patient__user').order_by('token_number')
+
+        # Build appointment list with patient names
+        appointments_list = []
+        for appt in today_appointments:
+            patient_user = appt.patient.user
+            appointments_list.append({
+                'id': appt.id,
+                'token_number': appt.token_number,
+                'time': str(appt.time),
+                'patient_name': patient_user.get_full_name() or patient_user.username,
+                'patient_age': appt.patient.age,
+                'patient_gender': appt.patient.gender,
+                'status': appt.status,
+                'reason': appt.reason,
+                'appointment_type': appt.appointment_type,
+                'prescription': appt.prescription or '',
+                'doctor_remark': appt.doctor_remark or '',
+                'advice': appt.advice or '',
+                'fee': str(appt.fee),
+            })
+
+        # Stats
+        total = today_appointments.count()
+        completed = today_appointments.filter(status='COMPLETED').count()
+        pending = today_appointments.filter(status='BOOKED').count()
+        cancelled = today_appointments.filter(status='CANCELLED').count()
+        earnings = today_appointments.filter(
+            status='COMPLETED'
         ).aggregate(total=Sum('fee'))['total'] or 0.00
 
         data = {
-            'todays_appointments': AppointmentSerializer(today_appointments, many=True).data,
-            'total_patients_today': today_appointments.count(),
-            'total_earnings': total_earnings,
+            'appointments': appointments_list,
+            'stats': {
+                'total_patients': total,
+                'completed': completed,
+                'pending': pending,
+                'cancelled': cancelled,
+                'earnings': float(earnings),
+            }
         }
         return Response({'message': 'Success', 'data': data})
 
@@ -286,11 +448,44 @@ class ReceptionistDashboardView(APIView):
             return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         today = date.today()
-        today_appointments = Appointment.objects.filter(date=today)
+        today_appointments = Appointment.objects.filter(
+            date=today
+        ).select_related(
+            'patient', 'patient__user', 'doctor', 'doctor__user'
+        ).order_by('token_number')
+
+        # Build appointment list with names
+        appointments_list = []
+        for appt in today_appointments:
+            patient_user = appt.patient.user
+            doctor_user = appt.doctor.user
+            appointments_list.append({
+                'id': appt.id,
+                'token_number': appt.token_number,
+                'time': str(appt.time),
+                'patient_name': patient_user.get_full_name() or patient_user.username,
+                'doctor_name': f'Dr. {doctor_user.get_full_name() or doctor_user.username}',
+                'status': appt.status,
+                'reason': appt.reason,
+                'appointment_type': appt.appointment_type,
+            })
+
+        # Stats
+        total = today_appointments.count()
+        arrived = today_appointments.filter(status='ARRIVED').count()
+        pending = today_appointments.filter(status='BOOKED').count()
+        completed = today_appointments.filter(status='COMPLETED').count()
+        cancelled = today_appointments.filter(status='CANCELLED').count()
 
         data = {
-            'todays_appointments': AppointmentSerializer(today_appointments, many=True).data,
-            'total_bookings_today': today_appointments.count(),
+            'appointments': appointments_list,
+            'stats': {
+                'total_patients': total,
+                'arrived': arrived,
+                'pending': pending,
+                'completed': completed,
+                'cancelled': cancelled,
+            }
         }
         return Response({'message': 'Success', 'data': data})
 
