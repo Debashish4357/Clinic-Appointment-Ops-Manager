@@ -1,7 +1,6 @@
 databases:
   - name: clinic-postgres
     databaseName: clinic_db
-    user: postgres
     plan: free
 
 services:
