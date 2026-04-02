@@ -8,7 +8,8 @@ const API = axios.create({
 API.interceptors.request.use(
   (req) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    const isAuthEndpoint = req.url.includes('token/') || req.url.includes('register/');
+    if (token && !isAuthEndpoint) {
       req.headers['Authorization'] = `Bearer ${token}`;
     }
     return req;
@@ -21,7 +22,9 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const isAuthEndpoint = error.config && (error.config.url.includes('token/') || error.config.url.includes('register/'));
+
+    if (error.response && error.response.status === 401 && !isAuthEndpoint) {
       const token = localStorage.getItem('token');
       if (token) {
         // Token was present but rejected → expired/revoked → clear & redirect
