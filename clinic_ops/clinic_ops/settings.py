@@ -99,7 +99,7 @@ else:
             "USER": "postgres",
             "PASSWORD": "hanuman",
             "HOST": "localhost",
-            "PORT": "5433",
+            "PORT": "5432",
         }
     }
 
