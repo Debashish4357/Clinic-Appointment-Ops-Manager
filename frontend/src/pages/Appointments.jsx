@@ -476,13 +476,13 @@ export default function Appointments() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                       </svg>
-                      Loading appointments...
+                      Loading...
                     </div>
                   ) : fetchError ? (
                     <div className="py-12 text-center text-red-400 text-sm px-6">{fetchError}</div>
                   ) : filtered.length === 0 ? (
                     <div className="py-16 text-center text-slate-500 text-sm">
-                      No appointments match your filters.
+                      No appointments found
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -528,13 +528,13 @@ export default function Appointments() {
                                   {role === 'DOCTOR' && appt.status === 'BOOKED' && (
                                     <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
                                       className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-40 whitespace-nowrap">
-                                      {updating === appt.id ? '...' : '✓ Complete'}
+                                      {updating === appt.id ? '...' : 'Mark Completed'}
                                     </button>
                                   )}
                                   {role === 'RECEPTIONIST' && appt.status === 'BOOKED' && (
                                     <button onClick={() => updateStatus(appt.id, 'CANCELLED')} disabled={updating === appt.id}
                                       className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-40 whitespace-nowrap">
-                                      {updating === appt.id ? '...' : '✕ Cancel'}
+                                      {updating === appt.id ? '...' : 'Cancel Appointment'}
                                     </button>
                                   )}
                                   {role === 'ADMIN' && appt.status === 'BOOKED' && (

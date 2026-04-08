@@ -79,7 +79,7 @@ export default function DoctorDashboard() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm">Loading your schedule...</p>
+          <p className="text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -128,71 +128,80 @@ export default function DoctorDashboard() {
         </div>
 
         {appointments.length > 0 ? (
-          <div className="divide-y divide-white/5">
-            {appointments.map((appt) => (
-              <div key={appt.id} className="px-6 py-4 hover:bg-white/5 transition-colors">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-
-                  {/* Left: Token + patient info */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center text-sm font-black">
-                      {appt.token_number}
-                    </div>
-                    <div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 bg-slate-900/50">
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Token</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Time</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Patient</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Reason</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {appointments.map((appt) => (
+                  <tr key={appt.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20 text-blue-300 text-xs font-black">
+                        {appt.token_number}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{appt.time}</td>
+                    <td className="px-4 py-3">
                       <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
                       <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                        <span>{appt.time}</span>
-                        {appt.patient_age && <span>· {appt.patient_age}yr</span>}
+                        {appt.patient_age && <span>{appt.patient_age}yr</span>}
                         {appt.patient_gender && <span>· {appt.patient_gender}</span>}
                         {appt.appointment_type === 'FOLLOWUP' && (
-                          <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px] font-bold">Follow-Up</span>
+                          <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px] font-bold ml-1">Follow-Up</span>
                         )}
                       </div>
-                      {appt.reason && (
-                        <p className="text-xs text-slate-500 mt-1 italic">"{appt.reason}"</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right: Status + Actions */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
-                      {appt.status}
-                    </span>
-
-                    {appt.status === 'BOOKED' && (
-                      <>
-                        <button
-                          onClick={() => markCompleted(appt.id)}
-                          disabled={updating === appt.id}
-                          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50">
-                          {updating === appt.id ? '...' : '✓ Complete'}
-                        </button>
-                        <button
-                          onClick={() => openPrescription(appt)}
-                          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-colors">
-                          📝 Prescription
-                        </button>
-                      </>
-                    )}
-
-                    {appt.status === 'COMPLETED' && appt.prescription && (
-                      <button
-                        onClick={() => openPrescription(appt)}
-                        className="text-xs font-medium px-2 py-1 rounded-lg text-slate-400 hover:text-purple-300 transition-colors">
-                        View Rx
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      {appt.reason ? <p className="text-xs text-slate-500 italic max-w-[180px] truncate">"{appt.reason}"</p> : <span className="text-slate-600">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
+                        {appt.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {appt.status === 'BOOKED' && (
+                          <>
+                            <button
+                              onClick={() => markCompleted(appt.id)}
+                              disabled={updating === appt.id}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 whitespace-nowrap">
+                              {updating === appt.id ? '...' : 'Mark Completed'}
+                            </button>
+                            <button
+                              onClick={() => openPrescription(appt)}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-colors whitespace-nowrap">
+                              📝 Prescription
+                            </button>
+                          </>
+                        )}
+                        {appt.status === 'COMPLETED' && appt.prescription && (
+                          <button
+                            onClick={() => openPrescription(appt)}
+                            className="text-xs font-medium px-2 py-1 rounded-lg text-slate-400 hover:text-purple-300 transition-colors whitespace-nowrap">
+                            View Rx
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="px-6 py-16 text-center">
             <p className="text-4xl mb-3">🩺</p>
-            <p className="text-slate-400 text-sm">No appointments scheduled for today.</p>
-            <p className="text-slate-600 text-xs mt-1">Patients will appear here as they book.</p>
+            <p className="text-slate-400 text-sm">No appointments found</p>
           </div>
         )}
       </div>

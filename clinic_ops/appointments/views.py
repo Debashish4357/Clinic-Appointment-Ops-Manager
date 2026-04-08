@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
+from django.utils.dateparse import parse_date, parse_time
 from django.db.models import Count, Sum
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -34,13 +35,13 @@ class AppointmentView(APIView):
         else:
             return Response({'message': 'Unauthorized role.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Optional filters: ?date=YYYY-MM-DD  &  ?doctor=<id>
+        # Optional filters: ?date=YYYY-MM-DD  &  ?doctor_id=<id>
         filter_date = request.query_params.get('date')
-        filter_doctor = request.query_params.get('doctor')
+        filter_doctor = request.query_params.get('doctor_id')
         if filter_date:
             appointments = appointments.filter(date=filter_date)
         if filter_doctor:
-            appointments = appointments.filter(doctor__id=filter_doctor)
+            appointments = appointments.filter(doctor_id=filter_doctor)
 
         serializer = AppointmentSerializer(appointments, many=True)
         return Response({'message': 'Success', 'data': serializer.data}, status=status.HTTP_200_OK)
@@ -83,14 +84,38 @@ class AppointmentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Parse date and time
+        appt_date_obj = parse_date(appt_date)
+        appt_time_obj = parse_time(appt_time)
+
+        if not appt_date_obj or not appt_time_obj:
+            return Response(
+                {'message': 'Invalid date or time format. Use YYYY-MM-DD and HH:MM.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Prevent booking in past date/time
+        if datetime.combine(appt_date_obj, appt_time_obj) < datetime.now():
+            return Response(
+                {'message': 'Cannot book an appointment in the past.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Ensure appointment is within doctor available time (Assume 09:00 - 17:00)
+        if not (time(9, 0) <= appt_time_obj <= time(17, 0)):
+            return Response(
+                {'message': 'Doctor is only available between 09:00 and 17:00.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Fetch doctor
         try:
             doctor = Doctor.objects.get(id=doctor_id)
         except Doctor.DoesNotExist:
             return Response({'message': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Conflict detection — same doctor, date, and time
-        if Appointment.objects.filter(doctor=doctor, date=appt_date, time=appt_time).exists():
+        # Prevent double booking (same doctor, date, and time)
+        if Appointment.objects.filter(doctor=doctor, date=appt_date, time=appt_time).exclude(status='CANCELLED').exists():
             return Response(
                 {'message': 'Doctor is already booked for this date and time.'},
                 status=status.HTTP_409_CONFLICT

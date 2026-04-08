@@ -65,7 +65,7 @@ export default function ReceptionistDashboard() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm">Loading queue...</p>
+          <p className="text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -193,7 +193,7 @@ export default function ReceptionistDashboard() {
                               onClick={() => updateStatus(appt.id, 'CANCELLED')}
                               disabled={updating === appt.id}
                               className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 whitespace-nowrap">
-                              {updating === appt.id ? '...' : '✕ Cancel'}
+                              {updating === appt.id ? '...' : 'Cancel Appointment'}
                             </button>
                           </>
                         )}
@@ -222,8 +222,7 @@ export default function ReceptionistDashboard() {
         ) : (
           <div className="px-6 py-16 text-center">
             <p className="text-4xl mb-3">🏥</p>
-            <p className="text-slate-400 text-sm">No appointments scheduled for today.</p>
-            <p className="text-slate-600 text-xs mt-1">Queue will populate as patients book.</p>
+            <p className="text-slate-400 text-sm">No appointments found</p>
           </div>
         )}
       </div>
