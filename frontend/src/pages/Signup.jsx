@@ -2,16 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { registerUser } from '../services/auth';
 
-const ROLES = [
-  { value: 'PATIENT',      label: 'Patient',      icon: '🏥', desc: 'Book & track your appointments' },
-  { value: 'DOCTOR',       label: 'Doctor',        icon: '👨‍⚕️', desc: 'Manage your daily schedule' },
-  { value: 'RECEPTIONIST', label: 'Receptionist',  icon: '📋', desc: 'Handle bookings & queue' },
-  { value: 'ADMIN',        label: 'Administrator', icon: '⚙️', desc: 'Full system access' },
-];
-
 export default function Signup() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ username: '', password: '', role: 'PATIENT' });
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [error, setError]       = useState(null);
   const [success, setSuccess]   = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +71,7 @@ export default function Signup() {
             <p className="text-slate-300 text-xs font-bold uppercase tracking-widest mb-6">Getting started is easy</p>
             {[
               { step: '01', title: 'Create your account', desc: 'Choose a username and secure password' },
-              { step: '02', title: 'Select your role',    desc: 'Patient, Doctor, Receptionist, or Admin' },
+              { step: '02', title: 'Complete profile',    desc: 'Enter basic details to book appointments' },
               { step: '03', title: 'Start managing',      desc: 'Access your personalised dashboard instantly' },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur">
@@ -195,31 +188,6 @@ export default function Signup() {
                   </p>
                 </div>
               )}
-            </div>
-
-            {/* Role selector — visual cards */}
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Role</label>
-              <div className="grid grid-cols-2 gap-2">
-                {ROLES.map(({ value, label, icon, desc }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, role: value }))}
-                    className={`text-left p-3 rounded-xl border text-sm transition-all duration-150 ${
-                      formData.role === value
-                        ? 'bg-blue-600/20 border-blue-500/60 shadow-lg shadow-blue-500/10'
-                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    <span className="text-lg block mb-1">{icon}</span>
-                    <span className={`font-bold block text-xs ${formData.role === value ? 'text-cyan-300' : 'text-white'}`}>
-                      {label}
-                    </span>
-                    <span className="text-slate-500 text-xs leading-tight block mt-0.5">{desc}</span>
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Submit */}

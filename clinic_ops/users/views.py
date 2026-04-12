@@ -41,16 +41,13 @@ class RegisterView(APIView):
         user = User.objects.create(
             username=data.get('username'),
             email=data.get('email', ''),
-            role=data.get('role', 'PATIENT'),
+            role='PATIENT',
             password=make_password(data.get('password'))
         )
 
-        if user.role == 'PATIENT':
-            Patient.objects.create(user=user)
-        elif user.role == 'DOCTOR':
-            Doctor.objects.create(user=user)
+        Patient.objects.create(user=user)
 
-        return Response({'detail': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+        return Response({'message': 'Patient registered successfully'}, status=status.HTTP_201_CREATED)
 
 
 # ── Patient Profile ───────────────────────────────────────────────────────────
