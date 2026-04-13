@@ -531,6 +531,12 @@ class PatientDashboardView(APIView):
         upcoming = appointments.filter(date__gte=date.today(), status=Appointment.Status.BOOKED).first()
 
         data = {
+            'profile': {
+                'username': request.user.username,
+                'age': patient.age,
+                'contact': patient.contact,
+                'medical_history': patient.medical_history,
+            },
             'patients_appointments': AppointmentSerializer(appointments, many=True).data,
             'upcoming_appointment': AppointmentSerializer(upcoming).data if upcoming else None,
             'token_number': upcoming.token_number if upcoming else None,
