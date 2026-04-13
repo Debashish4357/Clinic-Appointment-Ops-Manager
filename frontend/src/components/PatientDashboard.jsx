@@ -4,12 +4,15 @@ import API from '../services/api';
 /* ─── Status badge styles ────────────────────────────────────────── */
 const STATUS_STYLES = {
   BOOKED:    'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  ARRIVED:   'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30',
   COMPLETED: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
   CANCELLED: 'bg-red-500/20 text-red-300 border border-red-500/30',
   NO_SHOW:   'bg-orange-500/20 text-orange-300 border border-orange-500/30',
 };
 
-/* ─── Sidebar nav items ──────────────────────────────────────────── */
+const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+
+/* ─── Sidebar nav ────────────────────────────────────────────────── */
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -31,24 +34,42 @@ const NAV_ITEMS = [
   )},
 ];
 
-export default function PatientDashboard() {
-  const [profile, setProfile]         = useState(null);
-  const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [activeTab, setActiveTab]     = useState('upcoming');
-  const [avatarSrc, setAvatarSrc]     = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+/* ─── Helpers ────────────────────────────────────────────────────── */
+const todayStr = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
-  // Edit profile state
-  const [editing, setEditing]         = useState(false);
-  const [formData, setFormData]       = useState({ age: '', contact: '', medical_history: '' });
-  const [saving, setSaving]           = useState(false);
-  const [saveMsg, setSaveMsg]         = useState(null);
+const EMPTY_FORM = {
+  age: '', contact: '', gender: '',
+  emergency_contact: '', blood_group: '',
+  medical_history: '', allergies: '', current_medication: '',
+};
+
+export default function PatientDashboard() {
+  const [profile, setProfile]               = useState(null);
+  const [appointments, setAppointments]     = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
+  const [activeSection, setActiveSection]   = useState('dashboard');
+  const [activeTab, setActiveTab]           = useState('upcoming');
+  const [avatarSrc, setAvatarSrc]           = useState(null);   // displayed image (URL or base64)
+  const [sidebarOpen, setSidebarOpen]       = useState(false);
+
+  // Profile edit state
+  const [editing, setEditing]   = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [contactErr, setContactErr] = useState('');
+  const [ecErr, setEcErr]           = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [saveMsg, setSaveMsg]       = useState(null);
 
   const fileInputRef = useRef(null);
 
+  /* ── Fetch dashboard + appointments ─────────────────────────────── */
   useEffect(() => {
     Promise.all([
       API.get('dashboard/patient/'),
@@ -59,10 +80,17 @@ export default function PatientDashboard() {
         setProfile(prof);
         if (prof) {
           setFormData({
-            age: prof.age || '',
-            contact: prof.contact || '',
-            medical_history: prof.medical_history || '',
+            age:               prof.age               || '',
+            contact:           prof.contact           || '',
+            gender:            prof.gender            || '',
+            emergency_contact: prof.emergency_contact || '',
+            blood_group:       prof.blood_group       || '',
+            medical_history:   prof.medical_history   || '',
+            allergies:         prof.allergies         || '',
+            current_medication:prof.current_medication|| '',
           });
+          // Load persisted profile image from backend
+          if (prof.profile_image) setAvatarSrc(prof.profile_image);
         }
         setAppointments(apptRes.data.data || []);
       })
@@ -70,33 +98,62 @@ export default function PatientDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  /* Avatar upload (frontend only) */
-  const handleAvatarChange = (e) => {
+  /* ── Avatar upload ───────────────────────────────────────────────── */
+  const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // Preview immediately
     const reader = new FileReader();
     reader.onload = (ev) => setAvatarSrc(ev.target.result);
     reader.readAsDataURL(file);
+    // Persist to backend
+    const fd = new FormData();
+    fd.append('profile_image', file);
+    try {
+      const res = await API.patch('patient/profile/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const saved = res.data?.data?.profile_image;
+      if (saved) setAvatarSrc(saved);
+    } catch {
+      // preview still shown; silent fail
+    }
   };
 
-  /* Profile edit submit */
+  /* ── Contact validation helper ──────────────────────────────────── */
+  const validateContact = (val) => {
+    if (!val) return '';
+    if (!/^\d{10}$/.test(val)) return 'Must be exactly 10 digits.';
+    return '';
+  };
+
+  /* ── Profile save ───────────────────────────────────────────────── */
   const handleProfileSave = async (e) => {
     e.preventDefault();
+    const ce  = validateContact(formData.contact);
+    const ece = validateContact(formData.emergency_contact);
+    setContactErr(ce);
+    setEcErr(ece);
+    if (ce || ece) return;
+
     setSaving(true);
     setSaveMsg(null);
     try {
-      await API.post('patient/profile/', formData);
-      setProfile((prev) => ({ ...prev, ...formData }));
+      const res = await API.patch('patient/profile/', formData);
+      const updated = res.data?.data || {};
+      setProfile((prev) => ({ ...prev, ...updated }));
+      if (updated.profile_image) setAvatarSrc(updated.profile_image);
       setSaveMsg({ type: 'success', text: 'Profile updated successfully!' });
       setEditing(false);
-    } catch {
-      setSaveMsg({ type: 'error', text: 'Failed to update profile. Please try again.' });
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Failed to update profile.';
+      setSaveMsg({ type: 'error', text: msg });
     } finally {
       setSaving(false);
     }
   };
 
-  /* ── Loading / Error ─────────────────────────────────────────── */
+  /* ── Loading / Error ─────────────────────────────────────────────── */
   if (loading)
     return (
       <div className="flex items-center justify-center h-64">
@@ -117,20 +174,22 @@ export default function PatientDashboard() {
       </div>
     );
 
-  /* ── Date helpers ─────────────────────────────────────────────── */
-  const todayRaw = new Date();
-  const todayObj = new Date(todayRaw.getFullYear(), todayRaw.getMonth(), todayRaw.getDate());
+  /* ── Date helpers ─────────────────────────────────────────────────── */
+  const TODAY = todayStr();
+  const todayObj = new Date(TODAY + 'T00:00:00');
 
-  const upcoming = appointments.filter((a) => {
-    const d = new Date(a.date);
+  const todayAppts   = appointments.filter((a) => a.date === TODAY);
+  const upcoming     = appointments.filter((a) => {
+    const d = new Date(a.date + 'T00:00:00');
     return a.status === 'BOOKED' && d >= todayObj;
   });
-
-  const previous = appointments.filter((a) =>
+  const previous     = appointments.filter((a) =>
     ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)
   );
 
-  /* ── SIDEBAR ─────────────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════════════
+     SIDEBAR
+  ═══════════════════════════════════════════════════════════════════ */
   const Sidebar = () => (
     <aside className="w-64 shrink-0 bg-slate-900 border-r border-white/10 flex flex-col py-8 px-5 min-h-full">
       {/* Avatar */}
@@ -150,7 +209,7 @@ export default function PatientDashboard() {
               {profile?.username?.[0]?.toUpperCase() || 'P'}
             </div>
           )}
-          {/* Hover overlay */}
+          {/* Camera overlay */}
           <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -160,7 +219,6 @@ export default function PatientDashboard() {
           </div>
         </div>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-
         <p className="mt-3 text-white font-bold text-lg">{profile?.username || 'Patient'}</p>
         <span className="mt-1 px-3 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
           Patient
@@ -189,7 +247,9 @@ export default function PatientDashboard() {
     </aside>
   );
 
-  /* ── DASHBOARD SECTION ────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════════════
+     DASHBOARD SECTION — Upcoming + Previous
+  ═══════════════════════════════════════════════════════════════════ */
   const DashboardSection = () => (
     <div>
       <div className="mb-8">
@@ -199,17 +259,20 @@ export default function PatientDashboard() {
 
       {/* Tabs */}
       <div className="flex gap-4 border-b border-white/10 mb-6">
-        {['upcoming', 'previous'].map((tab) => (
+        {[
+          { key: 'upcoming',  label: 'Upcoming Appointments' },
+          { key: 'previous',  label: 'Previous Appointments' },
+        ].map(({ key, label }) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 px-1 border-b-2 font-bold text-sm capitalize transition-colors ${
-              activeTab === tab
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`pb-3 px-1 border-b-2 font-bold text-sm transition-colors ${
+              activeTab === key
                 ? 'border-cyan-400 text-cyan-400'
                 : 'border-transparent text-slate-400 hover:text-slate-300'
             }`}
           >
-            {tab === 'upcoming' ? 'Upcoming Appointments' : 'Previous Appointments'}
+            {label}
           </button>
         ))}
       </div>
@@ -295,7 +358,82 @@ export default function PatientDashboard() {
     </div>
   );
 
-  /* ── PROFILE SECTION ──────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════════════
+     MY APPOINTMENTS — TODAY ONLY
+  ═══════════════════════════════════════════════════════════════════ */
+  const AppointmentsSection = () => (
+    <div>
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-1">
+          <h1 className="text-2xl font-black text-white">My Appointments</h1>
+          <span className="px-3 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold">
+            Today
+          </span>
+        </div>
+        <p className="text-slate-400 text-sm">
+          Showing appointments for <span className="text-white font-semibold">{TODAY}</span>
+        </p>
+      </div>
+
+      {todayAppts.length > 0 ? (
+        <div className="space-y-4">
+          {todayAppts.map((appt) => (
+            <div
+              key={appt.id}
+              className="bg-slate-800/60 border border-cyan-500/20 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 hover:bg-slate-800/80 transition-colors"
+            >
+              {/* Doctor + time */}
+              <div>
+                <p className="text-white font-semibold text-base">
+                  {appt.doctor_name || `Doctor #${appt.doctor}`}
+                </p>
+                <p className="text-slate-400 text-sm mt-0.5">{appt.time}</p>
+              </div>
+
+              {/* Token + Status */}
+              <div className="flex items-center gap-5">
+                <div className="text-center">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Token</p>
+                  <p className="text-xl font-black text-cyan-400">{appt.token_number ?? '—'}</p>
+                </div>
+                <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
+                  {appt.status}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-slate-800/40 border border-white/10 rounded-2xl p-12 text-center">
+          <div className="w-14 h-14 rounded-full bg-slate-700/60 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p className="text-slate-400 font-medium">No appointments today</p>
+          <p className="text-slate-500 text-sm mt-1">Check your dashboard for upcoming appointments</p>
+        </div>
+      )}
+    </div>
+  );
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PROFILE SECTION
+  ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── Reusable input ─────────────────────────────────────────────── */
+  const Field = ({ label, id, children }) => (
+    <div>
+      <label htmlFor={id} className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+
+  const inputCls = 'w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500';
+
   const ProfileSection = () => (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -305,7 +443,7 @@ export default function PatientDashboard() {
         </div>
         {!editing && (
           <button
-            onClick={() => { setEditing(true); setSaveMsg(null); }}
+            onClick={() => { setEditing(true); setSaveMsg(null); setContactErr(''); setEcErr(''); }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30 font-bold text-sm transition-all"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -317,7 +455,7 @@ export default function PatientDashboard() {
         )}
       </div>
 
-      {/* Save message */}
+      {/* Save / error banner */}
       {saveMsg && (
         <div className={`mb-6 p-4 rounded-xl border text-sm font-medium ${
           saveMsg.type === 'success'
@@ -329,39 +467,124 @@ export default function PatientDashboard() {
       )}
 
       {editing ? (
-        /* ── Edit Form ── */
+        /* ── EDIT FORM ──────────────────────────────────────────────── */
         <form onSubmit={handleProfileSave} className="bg-slate-800/40 border border-white/10 rounded-2xl p-6 space-y-5">
           <h2 className="font-bold text-white text-lg mb-2">Edit Details</h2>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Age</label>
-            <input
-              type="number" min="1" max="120"
-              value={formData.age}
-              onChange={(e) => setFormData((p) => ({ ...p, age: e.target.value }))}
-              className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              placeholder="Enter your age"
-            />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Age */}
+            <Field label="Age" id="age">
+              <input
+                id="age"
+                type="number" min="1" max="120"
+                value={formData.age}
+                onChange={(e) => setFormData((p) => ({ ...p, age: e.target.value }))}
+                className={inputCls}
+                placeholder="Enter your age"
+              />
+            </Field>
+
+            {/* Gender */}
+            <Field label="Gender" id="gender">
+              <select
+                id="gender"
+                value={formData.gender}
+                onChange={(e) => setFormData((p) => ({ ...p, gender: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="">Select gender</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </Field>
+
+            {/* Contact */}
+            <Field label="Contact (10 digits)" id="contact">
+              <input
+                id="contact"
+                type="tel"
+                maxLength={10}
+                value={formData.contact}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  setFormData((p) => ({ ...p, contact: v }));
+                  setContactErr(validateContact(v));
+                }}
+                className={`${inputCls} ${contactErr ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                placeholder="10-digit mobile number"
+              />
+              {contactErr && <p className="mt-1 text-xs text-red-400">{contactErr}</p>}
+            </Field>
+
+            {/* Emergency Contact */}
+            <Field label="Emergency Contact (10 digits)" id="emergency_contact">
+              <input
+                id="emergency_contact"
+                type="tel"
+                maxLength={10}
+                value={formData.emergency_contact}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  setFormData((p) => ({ ...p, emergency_contact: v }));
+                  setEcErr(validateContact(v));
+                }}
+                className={`${inputCls} ${ecErr ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                placeholder="Emergency contact number"
+              />
+              {ecErr && <p className="mt-1 text-xs text-red-400">{ecErr}</p>}
+            </Field>
+
+            {/* Blood Group */}
+            <Field label="Blood Group" id="blood_group">
+              <select
+                id="blood_group"
+                value={formData.blood_group}
+                onChange={(e) => setFormData((p) => ({ ...p, blood_group: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="">Select blood group</option>
+                {BLOOD_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Contact</label>
-            <input
-              type="text"
-              value={formData.contact}
-              onChange={(e) => setFormData((p) => ({ ...p, contact: e.target.value }))}
-              className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              placeholder="Phone number or email"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Medical History</label>
+
+          {/* Medical History */}
+          <Field label="Medical History" id="medical_history">
             <textarea
-              rows={4}
+              id="medical_history"
+              rows={3}
               value={formData.medical_history}
               onChange={(e) => setFormData((p) => ({ ...p, medical_history: e.target.value }))}
-              className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
-              placeholder="Any known conditions, allergies, medications..."
+              className={`${inputCls} resize-none`}
+              placeholder="Any known conditions..."
             />
-          </div>
+          </Field>
+
+          {/* Allergies */}
+          <Field label="Allergies (optional)" id="allergies">
+            <textarea
+              id="allergies"
+              rows={2}
+              value={formData.allergies}
+              onChange={(e) => setFormData((p) => ({ ...p, allergies: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="e.g. Penicillin, Peanuts"
+            />
+          </Field>
+
+          {/* Current Medication */}
+          <Field label="Current Medication (optional)" id="current_medication">
+            <textarea
+              id="current_medication"
+              rows={2}
+              value={formData.current_medication}
+              onChange={(e) => setFormData((p) => ({ ...p, current_medication: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="e.g. Metformin 500mg daily"
+            />
+          </Field>
+
           <div className="flex gap-3 pt-1">
             <button
               type="submit" disabled={saving}
@@ -371,7 +594,7 @@ export default function PatientDashboard() {
             </button>
             <button
               type="button"
-              onClick={() => { setEditing(false); setSaveMsg(null); }}
+              onClick={() => { setEditing(false); setSaveMsg(null); setContactErr(''); setEcErr(''); }}
               className="px-6 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-sm transition-all"
             >
               Cancel
@@ -379,18 +602,25 @@ export default function PatientDashboard() {
           </div>
         </form>
       ) : (
-        /* ── View Profile ── */
+        /* ── VIEW PROFILE ───────────────────────────────────────────── */
         <div className="bg-slate-800/40 border border-white/10 rounded-2xl p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
-              { label: 'Username',        value: profile?.username },
-              { label: 'Age',             value: profile?.age ? `${profile.age} years` : null },
-              { label: 'Contact',         value: profile?.contact },
-              { label: 'Medical History', value: profile?.medical_history, full: true },
+              { label: 'Username',           value: profile?.username },
+              { label: 'Age',                value: profile?.age ? `${profile.age} yrs` : null },
+              { label: 'Gender',             value: profile?.gender
+                  ? profile.gender.charAt(0) + profile.gender.slice(1).toLowerCase()
+                  : null },
+              { label: 'Blood Group',        value: profile?.blood_group || null },
+              { label: 'Contact',            value: profile?.contact || null },
+              { label: 'Emergency Contact',  value: profile?.emergency_contact || null },
+              { label: 'Medical History',    value: profile?.medical_history || null, full: true },
+              { label: 'Allergies',          value: profile?.allergies || null, full: true },
+              { label: 'Current Medication', value: profile?.current_medication || null, full: true },
             ].map(({ label, value, full }) => (
               <div key={label} className={full ? 'sm:col-span-2' : ''}>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-                <p className={`font-medium ${value ? 'text-white' : 'text-slate-500 italic'}`}>
+                <p className={`font-medium text-sm ${value ? 'text-white' : 'text-slate-500 italic'}`}>
                   {value || 'Not set'}
                 </p>
               </div>
@@ -401,40 +631,15 @@ export default function PatientDashboard() {
     </div>
   );
 
-  /* ── APPOINTMENTS SECTION (full page from sidebar) ───────────── */
-  const AppointmentsSection = () => (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white">My Appointments</h1>
-        <p className="text-slate-400 text-sm mt-1">All your appointments in one place</p>
-      </div>
-      <div className="space-y-4">
-        {appointments.length > 0 ? appointments.map((appt) => (
-          <div key={appt.id} className="bg-slate-800/60 border border-white/10 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 hover:bg-slate-800/80 transition-colors">
-            <div>
-              <p className="text-white font-semibold">{appt.doctor_name || `Doctor #${appt.doctor}`}</p>
-              <p className="text-slate-400 text-sm">{appt.date} · {appt.time}</p>
-            </div>
-            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
-              {appt.status}
-            </span>
-          </div>
-        )) : (
-          <div className="bg-slate-800/40 border border-white/10 rounded-2xl p-8 text-center">
-            <p className="text-slate-400 text-sm">No appointments found.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
+  /* ═══════════════════════════════════════════════════════════════════
+     RENDER
+  ═══════════════════════════════════════════════════════════════════ */
   const renderSection = () => {
-    if (activeSection === 'profile') return <ProfileSection />;
+    if (activeSection === 'profile')      return <ProfileSection />;
     if (activeSection === 'appointments') return <AppointmentsSection />;
     return <DashboardSection />;
   };
 
-  /* ── Main Layout ─────────────────────────────────────────────── */
   return (
     <div className="flex min-h-[calc(100vh-64px)] -mx-4 sm:-mx-6 lg:-mx-8">
       {/* Mobile sidebar toggle */}

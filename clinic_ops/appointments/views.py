@@ -530,12 +530,24 @@ class PatientDashboardView(APIView):
         appointments = Appointment.objects.filter(patient=patient).order_by('date', 'time')
         upcoming = appointments.filter(date__gte=date.today(), status=Appointment.Status.BOOKED).first()
 
+        # Build profile image URL
+        profile_image_url = None
+        if patient.profile_image:
+            profile_image_url = request.build_absolute_uri(patient.profile_image.url)
+
         data = {
             'profile': {
-                'username': request.user.username,
-                'age': patient.age,
-                'contact': patient.contact,
-                'medical_history': patient.medical_history,
+                'username':           request.user.username,
+                'age':                patient.age,
+                'contact':            patient.contact,
+                'gender':             patient.gender,
+                'emergency_contact':  patient.emergency_contact,
+                'blood_group':        patient.blood_group,
+                'medical_history':    patient.medical_history,
+                'allergies':          patient.allergies,
+                'current_medication': patient.current_medication,
+                'profile_image':      profile_image_url,
+                'profile_completed':  patient.profile_completed,
             },
             'patients_appointments': AppointmentSerializer(appointments, many=True).data,
             'upcoming_appointment': AppointmentSerializer(upcoming).data if upcoming else None,
@@ -543,3 +555,4 @@ class PatientDashboardView(APIView):
             'estimated_wait_time': upcoming.estimated_wait_time if upcoming else None,
         }
         return Response({'message': 'Success', 'data': data})
+
