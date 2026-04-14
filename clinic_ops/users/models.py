@@ -25,10 +25,33 @@ class Doctor(models.Model):
 
 
 class Patient(models.Model):
+    class Gender(models.TextChoices):
+        MALE = 'MALE', 'Male'
+        FEMALE = 'FEMALE', 'Female'
+        OTHER = 'OTHER', 'Other'
+
+    class BloodGroup(models.TextChoices):
+        A_POS  = 'A+',  'A+'
+        A_NEG  = 'A-',  'A-'
+        B_POS  = 'B+',  'B+'
+        B_NEG  = 'B-',  'B-'
+        O_POS  = 'O+',  'O+'
+        O_NEG  = 'O-',  'O-'
+        AB_POS = 'AB+', 'AB+'
+        AB_NEG = 'AB-', 'AB-'
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient_profile')
     age = models.PositiveIntegerField(null=True, blank=True)
-    contact = models.CharField(max_length=20, blank=True)
+    contact = models.CharField(max_length=15, blank=True)
+    gender = models.CharField(max_length=10, choices=Gender.choices, blank=True)
+    emergency_contact = models.CharField(max_length=15, blank=True)
+    blood_group = models.CharField(max_length=5, choices=BloodGroup.choices, blank=True)
     medical_history = models.TextField(blank=True)
-    
+    allergies = models.TextField(blank=True)
+    current_medication = models.TextField(blank=True)
+    address = models.TextField(blank=True)
+    profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
+    profile_completed = models.BooleanField(default=False)
+
     def __str__(self):
         return self.user.get_full_name() or self.user.username

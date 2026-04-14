@@ -1,36 +1,42 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+const API = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/',
 });
 
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+// Attach JWT token to every request
+API.interceptors.request.use(
+  (req) => {
+    const token = localStorage.getItem('token');
+    const isAuthEndpoint = req.url.includes('token/') || req.url.includes('register/');
+    if (token && !isAuthEndpoint) {
+      req.headers['Authorization'] = `Bearer ${token}`;
     }
-    return config;
+    return req;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-api.interceptors.response.use(
+// Handle 401 — token expired or invalid → force re-login
+// Skip redirect if no token existed (i.e. login attempt with bad credentials)
+API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
+    const isAuthEndpoint = error.config && (error.config.url.includes('token/') || error.config.url.includes('register/'));
+
+    if (error.response && error.response.status === 401 && !isAuthEndpoint) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Token was present but rejected → expired/revoked → clear & redirect
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user_id');
+        window.location.href = '/';
+      }
+      // If no token, the user is on login page → let the error reach catch()
     }
     return Promise.reject(error);
   }
 );
 
-export default api;
+export default API;
