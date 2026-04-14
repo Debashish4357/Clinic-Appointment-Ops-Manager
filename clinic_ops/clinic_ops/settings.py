@@ -26,7 +26,7 @@ import os
 import dj_database_url
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = False
 
 ALLOWED_HOSTS = ['*'] # Allows Render URL to be accepted
 
@@ -94,12 +94,8 @@ if os.getenv('DATABASE_URL'):
 else:
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": "clinic_db",
-            "USER": "postgres",
-            "PASSWORD": "hanuman",
-            "HOST": "localhost",
-            "PORT": "5432",
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
         }
     }
 
@@ -149,7 +145,9 @@ REST_FRAMEWORK = {
     ),
 }
 
-CORS_ALLOW_ALL_ORIGINS = True  # For development purposes
+CORS_ALLOWED_ORIGINS = [
+    "https://your-frontend-url.onrender.com"
+]
 
 from datetime import timedelta
 
