@@ -256,6 +256,34 @@ class AppointmentDetailView(APIView):
                 if field in request.data:
                     setattr(appointment, field, request.data[field])
 
+        # ── PATIENT: Cancel own BOOKED appointment ───────────────────────────
+        elif role == 'PATIENT':
+            # Verify ownership
+            try:
+                patient = request.user.patient_profile
+            except Exception:
+                return Response({'message': 'Patient profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            if appointment.patient != patient:
+                return Response(
+                    {'message': 'You can only cancel your own appointments.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if new_status != 'CANCELLED':
+                return Response(
+                    {'message': 'Patients can only cancel appointments.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if appointment.status != 'BOOKED':
+                return Response(
+                    {'message': f'Cannot cancel an appointment with status {appointment.status}.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            appointment.status = 'CANCELLED'
+
         else:
             return Response(
                 {'message': 'Unauthorized action.'},

@@ -510,7 +510,7 @@ export default function Appointments() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-white/10 bg-slate-900/50">
-                            {['Token', 'Doctor', 'Patient', 'Date', 'Time', 'Wait', 'Type', 'Status', 'Actions'].map((h) => (
+                            {['Token No', 'Doctor', 'Patient', 'Date', 'Time', 'Wait', 'Type', 'Status', 'Actions'].map((h) => (
                               <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                                 {h}
                               </th>
@@ -550,6 +550,19 @@ export default function Appointments() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">
+                                  {role === 'PATIENT' && appt.status === 'BOOKED' && (
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm('Are you sure you want to cancel this appointment?')) {
+                                          updateStatus(appt.id, 'CANCELLED');
+                                        }
+                                      }}
+                                      disabled={updating === appt.id}
+                                      className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-40 whitespace-nowrap"
+                                    >
+                                      {updating === appt.id ? 'Cancelling...' : 'Cancel'}
+                                    </button>
+                                  )}
                                   {role === 'DOCTOR' && appt.status === 'BOOKED' && (
                                     <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
                                       className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-40 whitespace-nowrap">
