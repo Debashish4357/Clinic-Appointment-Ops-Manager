@@ -10,6 +10,12 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.PATIENT)
 
+    def save(self, *args, **kwargs):
+        # Superusers created via createsuperuser automatically become ADMIN
+        if self.is_superuser and self.role == self.Role.PATIENT:
+            self.role = self.Role.ADMIN
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.username} ({self.role})"
 

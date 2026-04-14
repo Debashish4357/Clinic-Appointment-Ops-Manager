@@ -150,52 +150,8 @@ class CreateDoctorView(APIView):
         )
 
 
-# ── Create Admin (RECEPTIONIST only) ─────────────────────────────────────────
-
-class CreateAdminView(APIView):
-    """POST /api/create-admin/ — RECEPTIONIST creates an ADMIN account."""
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        if request.user.role != 'RECEPTIONIST':
-            return Response(
-                {'message': 'Only receptionists can create admin accounts.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        username = request.data.get('username', '').strip()
-        password = request.data.get('password', '').strip()
-
-        if not username or not password:
-            return Response(
-                {'message': 'username and password are required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if len(password) < 6:
-            return Response(
-                {'message': 'Password must be at least 6 characters.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if User.objects.filter(username=username).exists():
-            return Response(
-                {'message': 'Username is already taken.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        User.objects.create(
-            username=username,
-            role='ADMIN',
-            password=make_password(password),
-        )
-
-        return Response(
-            {'message': f'Admin "{username}" created successfully.'},
-            status=status.HTTP_201_CREATED
-        )
-
-
-
 # ── Patient Profile ───────────────────────────────────────────────────────────
+
 
 def _build_profile_image_url(request, patient):
     """Return an absolute URL for the patient's profile image, or None."""
