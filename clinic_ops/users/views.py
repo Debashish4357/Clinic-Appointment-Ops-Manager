@@ -52,6 +52,105 @@ class RegisterView(APIView):
         return Response({'message': 'Patient registered successfully'}, status=status.HTTP_201_CREATED)
 
 
+# ── Create Receptionist (ADMIN only) ──────────────────────────────────────────
+
+class CreateReceptionistView(APIView):
+    """POST /api/create-receptionist/ — ADMIN creates a receptionist account."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'ADMIN':
+            return Response(
+                {'message': 'Only admins can create receptionist accounts.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        username = request.data.get('username', '').strip()
+        password = request.data.get('password', '').strip()
+
+        if not username or not password:
+            return Response(
+                {'message': 'username and password are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(password) < 6:
+            return Response(
+                {'message': 'Password must be at least 6 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'message': 'Username is already taken.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        User.objects.create(
+            username=username,
+            role='RECEPTIONIST',
+            password=make_password(password),
+        )
+
+        return Response(
+            {'message': f'Receptionist "{username}" created successfully.'},
+            status=status.HTTP_201_CREATED
+        )
+
+
+# ── Create Doctor (RECEPTIONIST only) ────────────────────────────────────────
+
+class CreateDoctorView(APIView):
+    """POST /api/create-doctor/ — RECEPTIONIST creates a doctor account."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'RECEPTIONIST':
+            return Response(
+                {'message': 'Only receptionists can create doctor accounts.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        username             = request.data.get('username', '').strip()
+        password             = request.data.get('password', '').strip()
+        specialization       = request.data.get('specialization', '').strip()
+        consultation_fee     = request.data.get('consultation_fee', 0)
+        avg_consultation_time= request.data.get('avg_consultation_time', 15)
+
+        if not username or not password:
+            return Response(
+                {'message': 'username and password are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(password) < 6:
+            return Response(
+                {'message': 'Password must be at least 6 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'message': 'Username is already taken.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.create(
+            username=username,
+            role='DOCTOR',
+            password=make_password(password),
+        )
+
+        Doctor.objects.create(
+            user=user,
+            specialization=specialization,
+            consultation_fee=consultation_fee,
+            avg_consultation_time=avg_consultation_time,
+        )
+
+        return Response(
+            {'message': f'Doctor "{username}" created successfully.'},
+            status=status.HTTP_201_CREATED
+        )
+
+
+
 # ── Patient Profile ───────────────────────────────────────────────────────────
 
 def _build_profile_image_url(request, patient):
