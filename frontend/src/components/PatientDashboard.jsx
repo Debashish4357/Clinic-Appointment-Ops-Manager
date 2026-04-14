@@ -47,6 +47,7 @@ const EMPTY_FORM = {
   age: '', contact: '', gender: '',
   emergency_contact: '', blood_group: '',
   medical_history: '', allergies: '', current_medication: '',
+  address: '',
 };
 
 export default function PatientDashboard() {
@@ -88,6 +89,7 @@ export default function PatientDashboard() {
             medical_history:   prof.medical_history   || '',
             allergies:         prof.allergies         || '',
             current_medication:prof.current_medication|| '',
+            address:           prof.address           || '',
           });
           // Load persisted profile image from backend
           if (prof.profile_image) setAvatarSrc(prof.profile_image);
@@ -503,13 +505,14 @@ export default function PatientDashboard() {
             <Field label="Contact (10 digits)" id="contact">
               <input
                 id="contact"
-                type="tel"
+                type="text"
+                inputMode="numeric"
                 maxLength={10}
                 value={formData.contact}
                 onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '');
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setFormData((p) => ({ ...p, contact: v }));
-                  setContactErr(validateContact(v));
+                  setContactErr(v && v.length !== 10 ? 'Must be exactly 10 digits.' : '');
                 }}
                 className={`${inputCls} ${contactErr ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                 placeholder="10-digit mobile number"
@@ -521,13 +524,14 @@ export default function PatientDashboard() {
             <Field label="Emergency Contact (10 digits)" id="emergency_contact">
               <input
                 id="emergency_contact"
-                type="tel"
+                type="text"
+                inputMode="numeric"
                 maxLength={10}
                 value={formData.emergency_contact}
                 onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '');
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setFormData((p) => ({ ...p, emergency_contact: v }));
-                  setEcErr(validateContact(v));
+                  setEcErr(v && v.length !== 10 ? 'Must be exactly 10 digits.' : '');
                 }}
                 className={`${inputCls} ${ecErr ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                 placeholder="Emergency contact number"
@@ -585,6 +589,18 @@ export default function PatientDashboard() {
             />
           </Field>
 
+          {/* Address */}
+          <Field label="Address (optional)" id="address">
+            <textarea
+              id="address"
+              rows={2}
+              value={formData.address}
+              onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="e.g. 12 MG Road, Bengaluru"
+            />
+          </Field>
+
           <div className="flex gap-3 pt-1">
             <button
               type="submit" disabled={saving}
@@ -614,6 +630,7 @@ export default function PatientDashboard() {
               { label: 'Blood Group',        value: profile?.blood_group || null },
               { label: 'Contact',            value: profile?.contact || null },
               { label: 'Emergency Contact',  value: profile?.emergency_contact || null },
+              { label: 'Address',            value: profile?.address || null, full: true },
               { label: 'Medical History',    value: profile?.medical_history || null, full: true },
               { label: 'Allergies',          value: profile?.allergies || null, full: true },
               { label: 'Current Medication', value: profile?.current_medication || null, full: true },

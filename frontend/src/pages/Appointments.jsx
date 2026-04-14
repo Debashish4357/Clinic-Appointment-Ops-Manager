@@ -7,6 +7,7 @@ import { logoutUser } from '../services/auth';
 const StatusBadge = ({ status }) => {
   const styles = {
     BOOKED:    'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    ARRIVED:   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
     COMPLETED: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     CANCELLED: 'bg-red-500/20 text-red-300 border-red-500/30',
     NO_SHOW:   'bg-amber-500/20 text-amber-300 border-amber-500/30',
@@ -16,6 +17,17 @@ const StatusBadge = ({ status }) => {
       {status || 'UNKNOWN'}
     </span>
   );
+};
+
+// ─── 12-hour time formatter ─────────────────────────────────────────────
+const fmt12h = (timeStr) => {
+  if (!timeStr) return '—';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
 };
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
@@ -232,7 +244,16 @@ export default function Appointments() {
 
   const doctorIds = useMemo(() => {
     if (!Array.isArray(appointments)) return [];
-    return [...new Set(appointments.map((a) => a.doctor))];
+    // Build unique doctor list with name + id for the filter dropdown
+    const seen = new Set();
+    const result = [];
+    appointments.forEach((a) => {
+      if (!seen.has(a.doctor)) {
+        seen.add(a.doctor);
+        result.push({ id: a.doctor, name: a.doctor_name || `Doctor #${a.doctor}` });
+      }
+    });
+    return result;
   }, [appointments]);
 
   // ── Book appointment ────────────────────────────────────────────────────────
@@ -450,8 +471,8 @@ export default function Appointments() {
                       onChange={(e) => setFilterDoctor(e.target.value)}
                       className="px-3 py-2 bg-slate-800 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400">
                       <option value="">All Doctors</option>
-                      {doctorIds.map((id) => (
-                        <option key={id} value={id}>Doctor #{id}</option>
+                      {doctorIds.map(({ id, name }) => (
+                        <option key={id} value={id}>{name}</option>
                       ))}
                     </select>
                     {filterDoctor && (
@@ -504,10 +525,14 @@ export default function Appointments() {
                                   {appt.token_number || '—'}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-slate-300 font-medium">#{appt.doctor}</td>
-                              <td className="px-4 py-3 text-slate-300">#{appt.patient}</td>
+                              <td className="px-4 py-3 text-slate-300 font-medium">
+                                {appt.doctor_name || `#${appt.doctor}`}
+                              </td>
+                              <td className="px-4 py-3 text-slate-300">
+                                {appt.patient_name || `#${appt.patient}`}
+                              </td>
                               <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{appt.date}</td>
-                              <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{appt.time}</td>
+                              <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{fmt12h(appt.time)}</td>
                               <td className="px-4 py-3 text-slate-400">
                                 {appt.estimated_wait_time != null ? `${appt.estimated_wait_time}m` : '—'}
                               </td>

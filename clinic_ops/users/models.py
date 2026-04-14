@@ -49,6 +49,7 @@ class Patient(models.Model):
     medical_history = models.TextField(blank=True)
     allergies = models.TextField(blank=True)
     current_medication = models.TextField(blank=True)
+    address = models.TextField(blank=True)
     profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
     profile_completed = models.BooleanField(default=False)
 

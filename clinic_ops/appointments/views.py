@@ -546,6 +546,7 @@ class PatientDashboardView(APIView):
                 'medical_history':    patient.medical_history,
                 'allergies':          patient.allergies,
                 'current_medication': patient.current_medication,
+                'address':            patient.address,
                 'profile_image':      profile_image_url,
                 'profile_completed':  patient.profile_completed,
             },

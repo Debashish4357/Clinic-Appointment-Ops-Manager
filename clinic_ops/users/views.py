@@ -86,6 +86,7 @@ class PatientProfileView(APIView):
             'medical_history': patient.medical_history,
             'allergies': patient.allergies,
             'current_medication': patient.current_medication,
+            'address': patient.address,
             'profile_image': _build_profile_image_url(request, patient),
             'profile_completed': patient.profile_completed,
         }
@@ -132,6 +133,8 @@ class PatientProfileView(APIView):
             patient.allergies = data['allergies']
         if data.get('current_medication') is not None:
             patient.current_medication = data['current_medication']
+        if data.get('address') is not None:
+            patient.address = data['address']
 
         # ── Profile image ────────────────────────────────────────────────────
         if 'profile_image' in request.FILES:
