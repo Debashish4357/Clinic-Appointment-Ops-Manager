@@ -109,84 +109,6 @@ const CreateDoctorForm = () => {
   );
 };
 
-/* ─── Create Admin Form ──────────────────────────────────────────── */
-const CreateAdminForm = () => {
-  const [form, setForm] = useState({ username: '', password: '' });
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg]       = useState(null);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setMsg(null);
-    try {
-      const res = await API.post('create-admin/', form);
-      setMsg({ type: 'success', text: res.data.message });
-      setForm({ username: '', password: '' });
-    } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to create admin.' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="bg-slate-800/60 border border-white/10 rounded-2xl p-6 mt-6 max-w-lg">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
-          <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-        </div>
-        <div>
-          <h2 className="font-bold text-white text-base">Create Admin</h2>
-          <p className="text-slate-400 text-xs mt-0.5">Register a new admin account</p>
-        </div>
-      </div>
-
-      {/* Alert */}
-      {msg && (
-        <div className={`mb-4 p-3 rounded-xl border text-sm font-medium ${
-          msg.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-            : 'bg-red-500/10 border-red-500/30 text-red-400'
-        }`}>
-          {msg.type === 'success' ? '✓ ' : '✕ '}{msg.text}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Username</label>
-          <input
-            type="text" required
-            value={form.username}
-            onChange={(e) => setForm(p => ({ ...p, username: e.target.value }))}
-            className={inputCls}
-            placeholder="admin_username"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Password</label>
-          <input
-            type="password" required minLength={6}
-            value={form.password}
-            onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))}
-            className={inputCls}
-            placeholder="Min. 6 characters"
-          />
-        </div>
-        <button type="submit" disabled={saving}
-          className="w-full py-3 rounded-xl font-bold text-white text-sm bg-gradient-to-r from-purple-600 to-violet-500 hover:from-purple-500 hover:to-violet-400 disabled:opacity-50 transition-all">
-          {saving ? 'Creating...' : 'Create Admin Account'}
-        </button>
-      </form>
-    </div>
-  );
-};
-
 /* ─── Main Receptionist Dashboard ────────────────────────────────── */
 export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -393,9 +315,6 @@ export default function ReceptionistDashboard() {
 
       {/* ── Create Doctor Panel ───────────────────────────────────────────────── */}
       <CreateDoctorForm />
-
-      {/* ── Create Admin Panel ────────────────────────────────────────────────── */}
-      <CreateAdminForm />
     </div>
   );
 }
