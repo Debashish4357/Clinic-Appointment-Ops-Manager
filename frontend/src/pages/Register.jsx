@@ -36,8 +36,8 @@ const Register = () => {
       }, 2000);
       
     } catch (err) {
-      if (err.response && err.response.data && err.response.data.error) {
-        setError(err.response.data.error);
+      if (err.response && err.response.data) {
+        setError(err.response.data.detail || err.response.data.error || 'Registration failed. Please try again.');
       } else {
         setError('Registration failed. Please try again.');
       }

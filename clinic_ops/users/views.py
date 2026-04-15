@@ -39,17 +39,24 @@ class RegisterView(APIView):
         data = request.data
         if User.objects.filter(username=data.get('username')).exists():
             return Response({'detail': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        role = data.get('role', 'PATIENT').upper()
+        if role not in dict(User.Role.choices):
+            role = 'PATIENT'
 
-        user = User.objects.create(
+        user = User.objects.create_user(
             username=data.get('username'),
             email=data.get('email', ''),
-            role='PATIENT',
-            password=make_password(data.get('password'))
+            role=role,
+            password=data.get('password')
         )
 
-        Patient.objects.create(user=user)
+        if role == 'PATIENT':
+            Patient.objects.create(user=user)
+        elif role == 'DOCTOR':
+            Doctor.objects.create(user=user)
 
-        return Response({'message': 'Patient registered successfully'}, status=status.HTTP_201_CREATED)
+        return Response({'message': f'{role.capitalize()} registered successfully'}, status=status.HTTP_201_CREATED)
 
 
 # ── Create Receptionist (ADMIN only) ──────────────────────────────────────────
@@ -84,10 +91,10 @@ class CreateReceptionistView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        User.objects.create(
+        User.objects.create_user(
             username=username,
             role='RECEPTIONIST',
-            password=make_password(password),
+            password=password,
         )
 
         return Response(
@@ -131,10 +138,10 @@ class CreateDoctorView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = User.objects.create(
+        user = User.objects.create_user(
             username=username,
             role='DOCTOR',
-            password=make_password(password),
+            password=password,
         )
 
         Doctor.objects.create(

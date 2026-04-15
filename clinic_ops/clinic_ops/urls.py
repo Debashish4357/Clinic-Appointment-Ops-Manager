@@ -17,4 +17,4 @@ urlpatterns = [
     # Appointments: /api/appointments/, /api/appointments/<id>/
     # Analytics:    /api/analytics/daily-patients/, /api/analytics/revenue/
     path('api/', include('appointments.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
