@@ -149,13 +149,13 @@ REST_FRAMEWORK = {
     ),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "https://your-frontend-url.onrender.com",
-    "http://localhost:5174",
-    "http://localhost:8080",
-    "http://localhost:3000",
-    "http://127.0.0.1:5174"
-]
+# CORS — allow all during development; override in production via env
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        os.getenv('FRONTEND_URL', 'https://your-frontend-url.onrender.com'),
+    ]
 
 CORS_ALLOW_CREDENTIALS = True
 
