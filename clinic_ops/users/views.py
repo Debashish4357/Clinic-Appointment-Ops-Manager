@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth import authenticate
 from django.conf import settings
 from .models import User, Doctor, Patient
 
@@ -20,7 +21,28 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        username = attrs.get('username')
+        password = attrs.get('password')
+        
+        # DEBUG: Log login attempt
+        print(f"[LOGIN_ATTEMPT] Username: {username}, Password length: {len(password) if password else 0}")
+        
+        # Explicitly authenticate using Django's authenticate function
+        user = authenticate(username=username, password=password)
+        print(f"[LOGIN_AUTH_RESULT] User: {user}, Username: {username}")
+        
+        if user is None:
+            print(f"[LOGIN_FAILED] Authentication failed for username: {username}")
+            # Call parent validate which will raise ValidationError
+            try:
+                data = super().validate(attrs)
+            except Exception as e:
+                print(f"[LOGIN_ERROR] {str(e)}")
+                raise
+        else:
+            print(f"[LOGIN_SUCCESS] User authenticated: {user.username}, Role: {user.role}")
+            data = super().validate(attrs)
+        
         data['role'] = self.user.role
         data['user_id'] = self.user.id
         return data
@@ -37,26 +59,42 @@ class RegisterView(APIView):
 
     def post(self, request):
         data = request.data
-        if User.objects.filter(username=data.get('username')).exists():
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+        
+        # DEBUG: Log signup attempt
+        print(f"[SIGNUP_ATTEMPT] Username: {username}, Email: {email}, Password length: {len(password)}")
+        
+        if User.objects.filter(username=username).exists():
+            print(f"[SIGNUP_FAILED] Username already exists: {username}")
             return Response({'detail': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
             
         role = data.get('role', 'PATIENT').upper()
         if role not in dict(User.Role.choices):
             role = 'PATIENT'
 
-        user = User.objects.create_user(
-            username=data.get('username'),
-            email=data.get('email', ''),
-            role=role,
-            password=data.get('password')
-        )
+        try:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                role=role,
+                password=password
+            )
+            print(f"[SIGNUP_SUCCESS] User created: {user.username}, Role: {role}, is_active: {user.is_active}")
+            print(f"[PASSWORD_HASH] Password hash: {user.password[:20]}...")
 
-        if role == 'PATIENT':
-            Patient.objects.create(user=user)
-        elif role == 'DOCTOR':
-            Doctor.objects.create(user=user)
+            if role == 'PATIENT':
+                Patient.objects.create(user=user)
+                print(f"[PATIENT_PROFILE_CREATED] Patient profile created for: {user.username}")
+            elif role == 'DOCTOR':
+                Doctor.objects.create(user=user)
+                print(f"[DOCTOR_PROFILE_CREATED] Doctor profile created for: {user.username}")
 
-        return Response({'message': f'{role.capitalize()} registered successfully'}, status=status.HTTP_201_CREATED)
+            return Response({'message': f'{role.capitalize()} registered successfully'}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            print(f"[SIGNUP_ERROR] {str(e)}")
+            return Response({'detail': f'Signup error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ── Create Receptionist (ADMIN only) ──────────────────────────────────────────
@@ -73,7 +111,7 @@ class CreateReceptionistView(APIView):
             )
 
         username = request.data.get('username', '').strip()
-        password = request.data.get('password', '').strip()
+        password = request.data.get('password', '')
 
         if not username or not password:
             return Response(
@@ -117,7 +155,7 @@ class CreateDoctorView(APIView):
             )
 
         username             = request.data.get('username', '').strip()
-        password             = request.data.get('password', '').strip()
+        password             = request.data.get('password', '')
         specialization       = request.data.get('specialization', '').strip()
         consultation_fee     = request.data.get('consultation_fee', 0)
         avg_consultation_time= request.data.get('avg_consultation_time', 15)
