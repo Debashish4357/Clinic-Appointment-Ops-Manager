@@ -38,7 +38,7 @@ https://clinic-frontend-49mz.onrender.com
 
 ### Backend
 - **Framework**: Django & Django REST Framework (DRF)
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL  , SQL lite
 - **Auth**: SimpleJWT (JSON Web Tokens)
 - **Logic**: Custom ORM queries for queue management and analytics.
 
