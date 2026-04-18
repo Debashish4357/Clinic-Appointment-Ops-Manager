@@ -14,6 +14,8 @@ from .models import User, Doctor, Patient
 # ── JWT Login ──────────────────────────────────────────────────────────────────
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Adds role + user_id to the JWT response payload."""
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -21,28 +23,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        username = attrs.get('username')
-        password = attrs.get('password')
-        
-        # DEBUG: Log login attempt
-        print(f"[LOGIN_ATTEMPT] Username: {username}, Password length: {len(password) if password else 0}")
-        
-        # Explicitly authenticate using Django's authenticate function
-        user = authenticate(username=username, password=password)
-        print(f"[LOGIN_AUTH_RESULT] User: {user}, Username: {username}")
-        
-        if user is None:
-            print(f"[LOGIN_FAILED] Authentication failed for username: {username}")
-            # Call parent validate which will raise ValidationError
-            try:
-                data = super().validate(attrs)
-            except Exception as e:
-                print(f"[LOGIN_ERROR] {str(e)}")
-                raise
-        else:
-            print(f"[LOGIN_SUCCESS] User authenticated: {user.username}, Role: {user.role}")
-            data = super().validate(attrs)
-        
+        data = super().validate(attrs)
         data['role'] = self.user.role
         data['user_id'] = self.user.id
         return data
@@ -52,49 +33,34 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-# ── Registration ───────────────────────────────────────────────────────────────
+# ── Patient Signup (public — PATIENT role only) ────────────────────────────────
 
 class RegisterView(APIView):
+    """POST /api/register/ — open to the public; always creates a PATIENT."""
     permission_classes = []
 
     def post(self, request):
-        data = request.data
-        username = data.get('username', '').strip()
-        email = data.get('email', '').strip()
-        password = data.get('password', '')
-        
-        # DEBUG: Log signup attempt
-        print(f"[SIGNUP_ATTEMPT] Username: {username}, Email: {email}, Password length: {len(password)}")
-        
+        username = request.data.get('username', '').strip()
+        email    = request.data.get('email', '').strip()
+        password = request.data.get('password', '')
+
+        if not username or not password:
+            return Response({'detail': 'username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
         if User.objects.filter(username=username).exists():
-            print(f"[SIGNUP_FAILED] Username already exists: {username}")
-            return Response({'detail': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        role = data.get('role', 'PATIENT').upper()
-        if role not in dict(User.Role.choices):
-            role = 'PATIENT'
+            return Response({'detail': 'Username already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = User.objects.create_user(
                 username=username,
                 email=email,
-                role=role,
-                password=password
+                role='PATIENT',
+                password=password,
             )
-            print(f"[SIGNUP_SUCCESS] User created: {user.username}, Role: {role}, is_active: {user.is_active}")
-            print(f"[PASSWORD_HASH] Password hash: {user.password[:20]}...")
-
-            if role == 'PATIENT':
-                Patient.objects.create(user=user)
-                print(f"[PATIENT_PROFILE_CREATED] Patient profile created for: {user.username}")
-            elif role == 'DOCTOR':
-                Doctor.objects.create(user=user)
-                print(f"[DOCTOR_PROFILE_CREATED] Doctor profile created for: {user.username}")
-
-            return Response({'message': f'{role.capitalize()} registered successfully'}, status=status.HTTP_201_CREATED)
+            Patient.objects.create(user=user)
+            return Response({'message': 'Patient account created successfully.'}, status=status.HTTP_201_CREATED)
         except Exception as e:
-            print(f"[SIGNUP_ERROR] {str(e)}")
-            return Response({'detail': f'Signup error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ── Create Receptionist (ADMIN only) ──────────────────────────────────────────
