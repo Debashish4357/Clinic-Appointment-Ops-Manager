@@ -369,6 +369,76 @@ class AppointmentMoveView(APIView):
             'message': f'Appointment moved {action.lower()} successfully.',
         }, status=status.HTTP_200_OK)
 
+
+class AppointmentWaitTimeView(APIView):
+    """PATCH /api/appointments/<id>/wait-time/ — adjust wait time by specific value."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role not in ['DOCTOR', 'RECEPTIONIST', 'ADMIN']:
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        change = request.data.get('change', 0)
+        try:
+            change = int(change)
+        except ValueError:
+            return Response({'message': 'Change must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            appt = Appointment.objects.get(pk=pk)
+        except Appointment.DoesNotExist:
+            return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        new_val = appt.estimated_wait_time + change
+        appt.estimated_wait_time = max(0, new_val)
+        appt.save(update_fields=['estimated_wait_time'])
+
+        return Response({'message': 'Wait time updated.', 'wait_time': appt.estimated_wait_time}, status=status.HTTP_200_OK)
+
+
+class AppointmentRescheduleView(APIView):
+    """PATCH /api/appointments/<id>/reschedule/ — change date/time."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role not in ['RECEPTIONIST', 'ADMIN']:
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        new_date = request.data.get('date')
+        new_time = request.data.get('time')
+
+        if not new_date or not new_time:
+            return Response({'message': 'Date and time are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            appt = Appointment.objects.get(pk=pk)
+        except Appointment.DoesNotExist:
+            return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if appt.status in ['COMPLETED', 'CANCELLED', 'NO_SHOW']:
+            return Response({'message': f'Cannot reschedule a {appt.status} appointment.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Basic parsing check
+        from django.utils.dateparse import parse_date, parse_time
+        d_obj = parse_date(new_date)
+        t_obj = parse_time(new_time)
+
+        if not d_obj or not t_obj:
+            return Response({'message': 'Invalid date/time format.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check for conflict
+        if Appointment.objects.filter(doctor=appt.doctor, date=new_date, time=new_time).exclude(id=appt.id).exclude(status='CANCELLED').exists():
+            return Response({'message': 'Doctor is already booked for this time.'}, status=status.HTTP_409_CONFLICT)
+
+        appt.date = new_date
+        appt.time = new_time
+        # Reset to booked if it was arrived
+        if appt.status == 'ARRIVED':
+            appt.status = 'BOOKED'
+        appt.save()
+
+        return Response({'message': 'Appointment rescheduled successfully.'}, status=status.HTTP_200_OK)
+
 # ── DOCTORS LIST ───────────────────────────────────────────────────────────────
 
 class DoctorListView(APIView):
@@ -459,6 +529,7 @@ class DoctorDashboardView(APIView):
                 'id': appt.id,
                 'token_number': appt.token_number,
                 'time': str(appt.time),
+                'patient_id': appt.patient.id,
                 'patient_name': patient_user.get_full_name() or patient_user.username,
                 'patient_age': appt.patient.age,
                 'patient_gender': appt.patient.gender,
@@ -469,6 +540,7 @@ class DoctorDashboardView(APIView):
                 'doctor_remark': appt.doctor_remark or '',
                 'advice': appt.advice or '',
                 'fee': str(appt.fee),
+                'estimated_wait_time': appt.estimated_wait_time,
             })
 
         # Stats
@@ -516,11 +588,13 @@ class ReceptionistDashboardView(APIView):
                 'id': appt.id,
                 'token_number': appt.token_number,
                 'time': str(appt.time),
+                'patient_id': appt.patient.id,
                 'patient_name': patient_user.get_full_name() or patient_user.username,
                 'doctor_name': f'Dr. {doctor_user.get_full_name() or doctor_user.username}',
                 'status': appt.status,
                 'reason': appt.reason,
                 'appointment_type': appt.appointment_type,
+                'estimated_wait_time': appt.estimated_wait_time,
             })
 
         # Stats

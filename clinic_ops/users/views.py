@@ -161,6 +161,40 @@ class CreateDoctorView(APIView):
         )
 
 
+# ── Patient Details (Quick View for DOCTOR / RECEPTIONIST) ───────────────────
+
+class PatientDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        if request.user.role not in ['DOCTOR', 'RECEPTIONIST', 'ADMIN']:
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            patient = Patient.objects.get(pk=pk)
+        except Patient.DoesNotExist:
+            return Response({'message': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get top 3 recent appointments
+        from appointments.models import Appointment
+        recent_appts = Appointment.objects.filter(patient=patient).order_by('-date', '-time')[:3]
+        recent_list = [
+            {'date': appt.date, 'status': appt.status}
+            for appt in recent_appts
+        ]
+
+        data = {
+            'name': patient.user.get_full_name() or patient.user.username,
+            'age': patient.age,
+            'contact': patient.contact,
+            'medical_history': patient.medical_history,
+            'allergies': patient.allergies,
+            'current_medication': patient.current_medication,
+            'recent_appointments': recent_list
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+
 # ── Patient Profile ───────────────────────────────────────────────────────────
 
 

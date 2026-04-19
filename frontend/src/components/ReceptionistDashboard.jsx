@@ -117,6 +117,15 @@ export default function ReceptionistDashboard() {
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(null);
 
+  // Patient Info modal
+  const [patientModal, setPatientModal] = useState(null); // patient details data
+  const [fetchingPatient, setFetchingPatient] = useState(false);
+
+  // Reschedule modal
+  const [rescheduleModal, setRescheduleModal] = useState(null); // appointment id
+  const [rescheduleForm, setRescheduleForm] = useState({ date: '', time: '' });
+  const [rescheduling, setRescheduling] = useState(false);
+
   const fetchData = () => {
     setLoading(true);
     API.get('dashboard/receptionist/')
@@ -154,6 +163,52 @@ export default function ReceptionistDashboard() {
       alert(err.response?.data?.message || 'Move failed.');
     } finally {
       setUpdating(null);
+    }
+  };
+
+  // ── Wait Time Adjust ──────────────────────────────────────────────────────
+  const adjustWaitTime = async (id, change) => {
+    setUpdating(id);
+    try {
+      await API.patch(`appointments/${id}/wait-time/`, { change });
+      fetchData();
+    } catch {
+      alert('Failed to update wait time.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // ── Fetch Patient Details ──────────────────────────────────────────────────
+  const fetchPatientDetails = async (patientId) => {
+    setFetchingPatient(true);
+    try {
+      const res = await API.get(`patient/${patientId}/details/`);
+      setPatientModal(res.data);
+    } catch {
+      alert('Failed to load patient details.');
+    } finally {
+      setFetchingPatient(false);
+    }
+  };
+
+  // ── Reschedule ────────────────────────────────────────────────────────────
+  const openReschedule = (appt) => {
+    setRescheduleModal(appt.id);
+    setRescheduleForm({ date: appt.date || '', time: appt.time || '' });
+  };
+
+  const submitReschedule = async (e) => {
+    e.preventDefault();
+    setRescheduling(true);
+    try {
+      await API.patch(`appointments/${rescheduleModal}/reschedule/`, rescheduleForm);
+      setRescheduleModal(null);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to reschedule.');
+    } finally {
+      setRescheduling(false);
     }
   };
 
@@ -238,7 +293,16 @@ export default function ReceptionistDashboard() {
 
                     {/* Patient */}
                     <td className="px-4 py-3">
-                      <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
+                        <button 
+                          onClick={() => fetchPatientDetails(appt.patient_id)}
+                          className="hover:text-cyan-400 text-slate-400 transition-colors"
+                          title="View Details"
+                        >
+                          👁
+                        </button>
+                      </div>
                       {appt.reason && (
                         <p className="text-slate-500 text-xs mt-0.5 italic truncate max-w-[180px]">"{appt.reason}"</p>
                       )}
@@ -247,11 +311,22 @@ export default function ReceptionistDashboard() {
                     {/* Doctor */}
                     <td className="px-4 py-3 text-slate-300 text-sm">{appt.doctor_name}</td>
 
-                    {/* Status */}
+                    {/* Status / Wait Time */}
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
-                        {appt.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
+                          {appt.status}
+                        </span>
+                        {(appt.status === 'BOOKED' || appt.status === 'ARRIVED') && (
+                          <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                            <span>Wait: {appt.estimated_wait_time}m</span>
+                            <div className="flex gap-1 bg-white/5 rounded px-1 border border-white/10">
+                              <button onClick={() => adjustWaitTime(appt.id, -5)} className="hover:text-red-400 p-0.5" title="-5 Min">➖</button>
+                              <button onClick={() => adjustWaitTime(appt.id, 5)} className="hover:text-emerald-400 p-0.5" title="+5 Min">➕</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Queue Move Buttons */}
@@ -280,19 +355,27 @@ export default function ReceptionistDashboard() {
                         {appt.status === 'BOOKED' && (
                           <>
                             <button onClick={() => updateStatus(appt.id, 'ARRIVED')} disabled={updating === appt.id}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors disabled:opacity-50 whitespace-nowrap">
-                              {updating === appt.id ? '...' : '📥 Check-In'}
+                              title="Check-In"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors disabled:opacity-50 text-base">
+                              📥
+                            </button>
+                            <button onClick={() => openReschedule(appt)} disabled={updating === appt.id}
+                              title="Reschedule"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 text-base">
+                              🔁
                             </button>
                             <button onClick={() => updateStatus(appt.id, 'CANCELLED')} disabled={updating === appt.id}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 whitespace-nowrap">
-                              {updating === appt.id ? '...' : 'Cancel'}
+                              title="Cancel"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 text-sm">
+                              ❌
                             </button>
                           </>
                         )}
                         {appt.status === 'ARRIVED' && (
                           <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
-                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 whitespace-nowrap">
-                            {updating === appt.id ? '...' : '📤 Check-Out'}
+                            title="Complete"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 text-sm">
+                            ✔✔
                           </button>
                         )}
                         {['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(appt.status) && (
@@ -315,6 +398,99 @@ export default function ReceptionistDashboard() {
 
       {/* ── Create Doctor Panel ───────────────────────────────────────────────── */}
       <CreateDoctorForm />
+
+      {/* ── Reschedule Modal ──────────────────────────────────────────────────── */}
+      {rescheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setRescheduleModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl leading-none">
+              ✕
+            </button>
+            <div className="mb-6">
+              <h3 className="font-bold text-white text-xl">🔁 Reschedule</h3>
+              <p className="text-slate-400 text-sm mt-1">Change the date and time of this appointment.</p>
+            </div>
+            
+            <form onSubmit={submitReschedule} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">New Date</label>
+                <input type="date" required min={new Date().toISOString().split('T')[0]}
+                  value={rescheduleForm.date} onChange={(e) => setRescheduleForm({ ...rescheduleForm, date: e.target.value })}
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">New Time</label>
+                <input type="time" required
+                  value={rescheduleForm.time} onChange={(e) => setRescheduleForm({ ...rescheduleForm, time: e.target.value })}
+                  className={inputCls} />
+              </div>
+
+              <div className="flex gap-3 mt-6 pt-2">
+                <button type="button" onClick={() => setRescheduleModal(null)}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={rescheduling}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-600 to-cyan-500 text-white disabled:opacity-50 shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5">
+                  {rescheduling ? '...' : 'Confirm'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Patient Info Modal ────────────────────────────────────────────────── */}
+      {patientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setPatientModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl leading-none">
+              ✕
+            </button>
+            <div className="mb-6">
+              <h3 className="font-bold text-white text-xl">{patientModal.name}</h3>
+              <p className="text-slate-400 text-sm">{patientModal.age} years old · {patientModal.contact}</p>
+            </div>
+            
+            <div className="space-y-4 text-sm mb-6">
+              <div className="bg-white/5 rounded-lg p-3">
+                <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medical History</span>
+                <p className="text-slate-300">{patientModal.medical_history || 'None provided'}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 rounded-lg p-3">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Allergies</span>
+                  <p className="text-slate-300">{patientModal.allergies || 'None'}</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medication</span>
+                  <p className="text-slate-300">{patientModal.current_medication || 'None'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Recent Appointments</span>
+              {patientModal.recent_appointments.length > 0 ? (
+                <ul className="space-y-2">
+                  {patientModal.recent_appointments.map((ra, idx) => (
+                    <li key={idx} className="flex justify-between items-center text-sm bg-white/5 px-3 py-2 rounded-lg text-slate-300">
+                      <span>{ra.date}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[ra.status] || 'bg-slate-600 text-slate-300'}`}>
+                        {ra.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-slate-500 text-sm italic">No recent history.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

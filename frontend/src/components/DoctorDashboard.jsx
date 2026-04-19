@@ -20,6 +20,10 @@ export default function DoctorDashboard() {
   const [prescForm, setPrescForm] = useState({ prescription: '', doctor_remark: '', advice: '' });
   const [prescSaving, setPrescSaving] = useState(false);
 
+  // Patient Info modal
+  const [patientModal, setPatientModal] = useState(null); // patient details data
+  const [fetchingPatient, setFetchingPatient] = useState(false);
+
   const fetchData = () => {
     setLoading(true);
     API.get('dashboard/doctor/')
@@ -67,6 +71,32 @@ export default function DoctorDashboard() {
       alert('Failed to save prescription.');
     } finally {
       setPrescSaving(false);
+    }
+  };
+
+  // ── Wait Time Adjust ──────────────────────────────────────────────────────
+  const adjustWaitTime = async (id, change) => {
+    setUpdating(id);
+    try {
+      await API.patch(`appointments/${id}/wait-time/`, { change });
+      fetchData();
+    } catch {
+      alert('Failed to update wait time.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // ── Fetch Patient Details ──────────────────────────────────────────────────
+  const fetchPatientDetails = async (patientId) => {
+    setFetchingPatient(true);
+    try {
+      const res = await API.get(`patient/${patientId}/details/`);
+      setPatientModal(res.data);
+    } catch {
+      alert('Failed to load patient details.');
+    } finally {
+      setFetchingPatient(false);
     }
   };
 
@@ -136,7 +166,7 @@ export default function DoctorDashboard() {
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Time</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Patient</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Reason</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status/Wait</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
@@ -150,7 +180,16 @@ export default function DoctorDashboard() {
                     </td>
                     <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{appt.time}</td>
                     <td className="px-4 py-3">
-                      <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
+                        <button 
+                          onClick={() => fetchPatientDetails(appt.patient_id)}
+                          className="hover:text-cyan-400 text-slate-400 transition-colors"
+                          title="View Details"
+                        >
+                          👁
+                        </button>
+                      </div>
                       <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                         {appt.patient_age && <span>{appt.patient_age}yr</span>}
                         {appt.patient_gender && <span>· {appt.patient_gender}</span>}
@@ -163,9 +202,20 @@ export default function DoctorDashboard() {
                       {appt.reason ? <p className="text-xs text-slate-500 italic max-w-[180px] truncate">"{appt.reason}"</p> : <span className="text-slate-600">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
-                        {appt.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
+                          {appt.status}
+                        </span>
+                        {(appt.status === 'BOOKED' || appt.status === 'ARRIVED') && (
+                          <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                            <span>Wait: {appt.estimated_wait_time}m</span>
+                            <div className="flex gap-1 bg-white/5 rounded px-1 border border-white/10">
+                              <button onClick={() => adjustWaitTime(appt.id, -5)} className="hover:text-red-400 p-0.5" title="-5 Min">➖</button>
+                              <button onClick={() => adjustWaitTime(appt.id, 5)} className="hover:text-emerald-400 p-0.5" title="+5 Min">➕</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -174,13 +224,15 @@ export default function DoctorDashboard() {
                             <button
                               onClick={() => markCompleted(appt.id)}
                               disabled={updating === appt.id}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 whitespace-nowrap">
-                              {updating === appt.id ? '...' : 'Mark Completed'}
+                              title="Mark Completed"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50">
+                              {updating === appt.id ? '...' : '✔✔'}
                             </button>
                             <button
                               onClick={() => openPrescription(appt)}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-colors whitespace-nowrap">
-                              📝 Prescription
+                              title="Prescription"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-colors text-sm">
+                              📝
                             </button>
                           </>
                         )}
@@ -251,6 +303,57 @@ export default function DoctorDashboard() {
                 className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-purple-600 to-blue-500 text-white disabled:opacity-50 shadow-lg shadow-purple-600/20 transition-all hover:-translate-y-0.5">
                 {prescSaving ? 'Saving...' : 'Save Prescription'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Patient Info Modal ────────────────────────────────────────────────── */}
+      {patientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setPatientModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl leading-none">
+              ✕
+            </button>
+            <div className="mb-6">
+              <h3 className="font-bold text-white text-xl">{patientModal.name}</h3>
+              <p className="text-slate-400 text-sm">{patientModal.age} years old · {patientModal.contact}</p>
+            </div>
+            
+            <div className="space-y-4 text-sm mb-6">
+              <div className="bg-white/5 rounded-lg p-3">
+                <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medical History</span>
+                <p className="text-slate-300">{patientModal.medical_history || 'None provided'}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 rounded-lg p-3">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Allergies</span>
+                  <p className="text-slate-300">{patientModal.allergies || 'None'}</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medication</span>
+                  <p className="text-slate-300">{patientModal.current_medication || 'None'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Recent Appointments</span>
+              {patientModal.recent_appointments.length > 0 ? (
+                <ul className="space-y-2">
+                  {patientModal.recent_appointments.map((ra, idx) => (
+                    <li key={idx} className="flex justify-between items-center text-sm bg-white/5 px-3 py-2 rounded-lg text-slate-300">
+                      <span>{ra.date}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[ra.status] || 'bg-slate-600 text-slate-300'}`}>
+                        {ra.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-slate-500 text-sm italic">No recent history.</p>
+              )}
             </div>
           </div>
         </div>
