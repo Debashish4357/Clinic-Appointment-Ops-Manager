@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     AppointmentView, AppointmentDetailView, AppointmentMoveView,
     AppointmentWaitTimeView, AppointmentRescheduleView,
+    AppointmentCompleteView, AppointmentVitalsView,
     DailyPatientsView, RevenueView,
     AdminDashboardView, DoctorDashboardView,
     ReceptionistDashboardView, PatientDashboardView,
@@ -18,6 +19,8 @@ urlpatterns = [
     path('appointments/<int:pk>/move/', AppointmentMoveView.as_view(), name='appointment_move'),
     path('appointments/<int:pk>/wait-time/', AppointmentWaitTimeView.as_view(), name='appointment_wait_time'),
     path('appointments/<int:pk>/reschedule/', AppointmentRescheduleView.as_view(), name='appointment_reschedule'),
+    path('appointments/<int:pk>/complete/', AppointmentCompleteView.as_view(), name='appointment_complete'),
+    path('appointments/<int:pk>/vitals/', AppointmentVitalsView.as_view(), name='appointment_vitals'),
 
     # Analytics
     path('analytics/daily-patients/', DailyPatientsView.as_view(), name='analytics_daily_patients'),

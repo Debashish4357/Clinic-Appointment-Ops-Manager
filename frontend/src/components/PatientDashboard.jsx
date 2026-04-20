@@ -337,7 +337,17 @@ export default function PatientDashboard() {
                 <div className="bg-slate-900/50 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs font-bold text-cyan-400/70 uppercase tracking-wider mb-1">Prescription</p>
-                    <p className="text-slate-300 text-sm whitespace-pre-line">{appt.prescription || 'N/A'}</p>
+                    <div className="text-slate-300 text-sm whitespace-pre-line">
+                      {Array.isArray(appt.prescription) ? (
+                        appt.prescription.map((m, i) => (
+                          <div key={i}>
+                            • {m.medicine} {m.dosage && `(${m.dosage})`} {m.duration && `- ${m.duration}`} {m.frequency && `[${m.frequency}]`}
+                          </div>
+                        ))
+                      ) : (
+                        appt.prescription || 'N/A'
+                      )}
+                    </div>
                   </div>
                   <div>
                     <p className="text-xs font-bold text-cyan-400/70 uppercase tracking-wider mb-1">Advice</p>

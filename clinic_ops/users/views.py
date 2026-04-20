@@ -178,19 +178,33 @@ class PatientDetailView(APIView):
         # Get top 3 recent appointments
         from appointments.models import Appointment
         recent_appts = Appointment.objects.filter(patient=patient).order_by('-date', '-time')[:3]
-        recent_list = [
-            {'date': appt.date, 'status': appt.status}
-            for appt in recent_appts
-        ]
+        recent_list = []
+        for appt in recent_appts:
+            # Build a short prescription summary string
+            presc_summary = ''
+            if appt.prescription and isinstance(appt.prescription, list):
+                names = [m.get('medicine', '') for m in appt.prescription if m.get('medicine')]
+                presc_summary = ', '.join(names[:2])
+                if len(names) > 2:
+                    presc_summary += f' +{len(names) - 2} more'
+            recent_list.append({
+                'date': appt.date,
+                'status': appt.status,
+                'prescription_summary': presc_summary,
+                'doctor_notes': appt.doctor_notes or '',
+            })
 
         data = {
             'name': patient.user.get_full_name() or patient.user.username,
             'age': patient.age,
             'contact': patient.contact,
+            'gender': patient.gender,
+            'blood_group': patient.blood_group,
             'medical_history': patient.medical_history,
             'allergies': patient.allergies,
             'current_medication': patient.current_medication,
-            'recent_appointments': recent_list
+            'lab_reports': patient.lab_reports or [],
+            'recent_appointments': recent_list,
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -305,3 +319,30 @@ class PatientProfileView(APIView):
         if err:
             return err
         return self._save(request, patient)
+
+# ── List Views (for Dropdowns) ────────────────────────────────────────────────
+
+class DoctorListView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        doctors = Doctor.objects.select_related('user').all()
+        data = [{
+            'id': d.id,
+            'name': f"Dr. {d.user.get_full_name() or d.user.username}",
+            'specialization': d.specialization
+        } for d in doctors]
+        return Response(data, status=status.HTTP_200_OK)
+
+class PatientListView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        patients = Patient.objects.select_related('user').all()
+        data = [{
+            'id': p.id,
+            'name': p.user.get_full_name() or p.user.username,
+            'contact': p.contact
+        } for p in patients]
+        return Response(data, status=status.HTTP_200_OK)
+

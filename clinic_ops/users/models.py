@@ -58,6 +58,7 @@ class Patient(models.Model):
     address = models.TextField(blank=True)
     profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
     profile_completed = models.BooleanField(default=False)
+    lab_reports = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return self.user.get_full_name() or self.user.username

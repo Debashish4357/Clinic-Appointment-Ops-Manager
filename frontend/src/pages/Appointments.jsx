@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../services/api';
 import { logoutUser } from '../services/auth';
+import AppointmentBooking from '../components/AppointmentBooking';
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
@@ -447,8 +448,15 @@ export default function Appointments() {
                 </div>
               )}
 
+              {/* ── Booking Form (Receptionist / Admin) ─────────────────────────────────── */}
+              {['ADMIN', 'RECEPTIONIST'].includes(role) && (
+                <div className="xl:col-span-1">
+                  <AppointmentBooking onBookingSuccess={fetchAppointments} />
+                </div>
+              )}
+
               {/* ── Table Panel ──────────────────────────────────────────────────── */}
-              <div className={role === 'PATIENT' ? 'xl:col-span-3' : 'xl:col-span-4'}>
+              <div className={['PATIENT', 'ADMIN', 'RECEPTIONIST'].includes(role) ? 'xl:col-span-3' : 'xl:col-span-4'}>
                 {/* Filter bar */}
                 <div className="flex flex-wrap gap-3 mb-4">
                   <div className="flex items-center gap-2">

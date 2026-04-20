@@ -439,6 +439,60 @@ class AppointmentRescheduleView(APIView):
 
         return Response({'message': 'Appointment rescheduled successfully.'}, status=status.HTTP_200_OK)
 
+class AppointmentCompleteView(APIView):
+    """PATCH /api/appointments/<id>/complete/"""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role != 'DOCTOR':
+            return Response({'message': 'Only Doctors can complete appointments.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            appt = Appointment.objects.get(pk=pk)
+        except Appointment.DoesNotExist:
+            return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if appt.status not in ['BOOKED', 'ARRIVED']:
+            return Response({'message': f'Cannot complete an appointment with status {appt.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        appt.status = 'COMPLETED'
+        if 'prescription' in request.data:
+            appt.prescription = request.data['prescription']
+        if 'notes' in request.data:
+            appt.doctor_notes = request.data['notes']
+            
+        appt.save(update_fields=['status', 'prescription', 'doctor_notes'])
+        return Response({'message': 'Appointment completed successfully.'}, status=status.HTTP_200_OK)
+
+
+class AppointmentVitalsView(APIView):
+    """PATCH /api/appointments/<id>/vitals/"""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role != 'RECEPTIONIST':
+            return Response({'message': 'Only Receptionists can add vitals.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            appt = Appointment.objects.get(pk=pk)
+        except Appointment.DoesNotExist:
+            return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if appt.status in ['COMPLETED', 'CANCELLED', 'NO_SHOW']:
+            return Response({'message': 'Cannot add vitals to closed appointments.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if 'bp' in request.data:
+            appt.bp = request.data['bp']
+        if 'heart_rate' in request.data:
+            appt.heart_rate = request.data['heart_rate']
+        if 'weight' in request.data:
+            appt.weight = request.data['weight']
+        if 'temperature' in request.data:
+            appt.temperature = request.data['temperature']
+
+        appt.save(update_fields=['bp', 'heart_rate', 'weight', 'temperature'])
+        return Response({'message': 'Vitals saved successfully.'}, status=status.HTTP_200_OK)
+
 # ── DOCTORS LIST ───────────────────────────────────────────────────────────────
 
 class DoctorListView(APIView):
@@ -536,11 +590,16 @@ class DoctorDashboardView(APIView):
                 'status': appt.status,
                 'reason': appt.reason,
                 'appointment_type': appt.appointment_type,
-                'prescription': appt.prescription or '',
+                'prescription': appt.prescription or [],
                 'doctor_remark': appt.doctor_remark or '',
                 'advice': appt.advice or '',
                 'fee': str(appt.fee),
                 'estimated_wait_time': appt.estimated_wait_time,
+                'bp': appt.bp or '',
+                'heart_rate': appt.heart_rate or '',
+                'weight': appt.weight or '',
+                'temperature': appt.temperature or '',
+                'doctor_notes': appt.doctor_notes or '',
             })
 
         # Stats
@@ -552,6 +611,13 @@ class DoctorDashboardView(APIView):
             status='COMPLETED'
         ).aggregate(total=Sum('fee'))['total'] or 0.00
 
+        # ── Smart Queue ────────────────────────────────────────────────────────
+        # Active queue: BOOKED or ARRIVED, ordered by token_number
+        active_queue = [a for a in appointments_list if a['status'] in ['BOOKED', 'ARRIVED']]
+        now_serving = active_queue[0] if active_queue else None
+        next_patient = active_queue[1] if len(active_queue) > 1 else None
+        waiting_count = len(active_queue)
+
         data = {
             'appointments': appointments_list,
             'stats': {
@@ -560,7 +626,12 @@ class DoctorDashboardView(APIView):
                 'pending': pending,
                 'cancelled': cancelled,
                 'earnings': float(earnings),
-            }
+            },
+            'queue': {
+                'now_serving': now_serving,
+                'next_patient': next_patient,
+                'waiting_count': waiting_count,
+            },
         }
         return Response({'message': 'Success', 'data': data})
 
@@ -595,6 +666,11 @@ class ReceptionistDashboardView(APIView):
                 'reason': appt.reason,
                 'appointment_type': appt.appointment_type,
                 'estimated_wait_time': appt.estimated_wait_time,
+                # Vitals
+                'bp': appt.bp or '',
+                'heart_rate': appt.heart_rate or '',
+                'weight': appt.weight or '',
+                'temperature': appt.temperature or '',
             })
 
         # Stats

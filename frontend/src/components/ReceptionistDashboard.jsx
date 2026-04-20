@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import API from '../services/api';
 
 const STATUS_STYLES = {
@@ -109,6 +110,17 @@ const CreateDoctorForm = () => {
   );
 };
 
+/* ─── Vitals Indicator ─────────────────────────────────────────────── */
+function VitalsIndicator({ appt }) {
+  const hasVitals = appt.bp || appt.heart_rate || appt.weight || appt.temperature;
+  if (!hasVitals) return null;
+  return (
+    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-teal-500/15 text-teal-300 rounded border border-teal-500/20 ml-1">
+      ✓ Vitals
+    </span>
+  );
+}
+
 /* ─── Main Receptionist Dashboard ────────────────────────────────── */
 export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -118,13 +130,18 @@ export default function ReceptionistDashboard() {
   const [updating, setUpdating] = useState(null);
 
   // Patient Info modal
-  const [patientModal, setPatientModal] = useState(null); // patient details data
+  const [patientModal, setPatientModal] = useState(null);
   const [fetchingPatient, setFetchingPatient] = useState(false);
 
   // Reschedule modal
-  const [rescheduleModal, setRescheduleModal] = useState(null); // appointment id
+  const [rescheduleModal, setRescheduleModal] = useState(null);
   const [rescheduleForm, setRescheduleForm] = useState({ date: '', time: '' });
   const [rescheduling, setRescheduling] = useState(false);
+
+  // Vitals modal
+  const [vitalsModal, setVitalsModal] = useState(null); // { id, existing }
+  const [vitalsForm, setVitalsForm] = useState({ bp: '', heart_rate: '', weight: '', temperature: '' });
+  const [savingVitals, setSavingVitals] = useState(false);
 
   const fetchData = () => {
     setLoading(true);
@@ -140,7 +157,7 @@ export default function ReceptionistDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // ── Status action ─────────────────────────────────────────────────────────
+  // ── Status action ─────────────────────────────────────────────────────────────
   const updateStatus = async (id, newStatus) => {
     setUpdating(id);
     try {
@@ -153,7 +170,7 @@ export default function ReceptionistDashboard() {
     }
   };
 
-  // ── Move up / down ────────────────────────────────────────────────────────
+  // ── Move up / down ────────────────────────────────────────────────────────────
   const moveQueue = async (id, action) => {
     setUpdating(id);
     try {
@@ -166,7 +183,7 @@ export default function ReceptionistDashboard() {
     }
   };
 
-  // ── Wait Time Adjust ──────────────────────────────────────────────────────
+  // ── Wait Time Adjust ──────────────────────────────────────────────────────────
   const adjustWaitTime = async (id, change) => {
     setUpdating(id);
     try {
@@ -179,7 +196,7 @@ export default function ReceptionistDashboard() {
     }
   };
 
-  // ── Fetch Patient Details ──────────────────────────────────────────────────
+  // ── Fetch Patient Details ─────────────────────────────────────────────────────
   const fetchPatientDetails = async (patientId) => {
     setFetchingPatient(true);
     try {
@@ -192,7 +209,7 @@ export default function ReceptionistDashboard() {
     }
   };
 
-  // ── Reschedule ────────────────────────────────────────────────────────────
+  // ── Reschedule ────────────────────────────────────────────────────────────────
   const openReschedule = (appt) => {
     setRescheduleModal(appt.id);
     setRescheduleForm({ date: appt.date || '', time: appt.time || '' });
@@ -212,7 +229,40 @@ export default function ReceptionistDashboard() {
     }
   };
 
-  // ── Loading / Error ───────────────────────────────────────────────────────
+  // ── Vitals ────────────────────────────────────────────────────────────────────
+  const openVitals = (appt) => {
+    setVitalsModal(appt.id);
+    setVitalsForm({
+      bp: appt.bp || '',
+      heart_rate: appt.heart_rate ? String(appt.heart_rate) : '',
+      weight: appt.weight ? String(appt.weight) : '',
+      temperature: appt.temperature ? String(appt.temperature) : '',
+    });
+  };
+
+  const submitVitals = async (e) => {
+    e.preventDefault();
+    setSavingVitals(true);
+    try {
+      const payload = {
+        bp: vitalsForm.bp || undefined,
+        heart_rate: vitalsForm.heart_rate ? Number(vitalsForm.heart_rate) : undefined,
+        weight: vitalsForm.weight ? Number(vitalsForm.weight) : undefined,
+        temperature: vitalsForm.temperature ? Number(vitalsForm.temperature) : undefined,
+      };
+      // Remove undefined keys
+      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+      await API.patch(`appointments/${vitalsModal}/vitals/`, payload);
+      setVitalsModal(null);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save vitals.');
+    } finally {
+      setSavingVitals(false);
+    }
+  };
+
+  // ── Loading / Error ───────────────────────────────────────────────────────────
   if (loading)
     return (
       <div className="flex items-center justify-center h-64">
@@ -229,17 +279,28 @@ export default function ReceptionistDashboard() {
   if (error)
     return <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-6 text-center">{error}</div>;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white">Receptionist Dashboard</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Queue management · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+      <div className="mb-8 flex justify-between items-center bg-slate-800/40 p-6 rounded-2xl border border-white/5">
+        <div>
+          <h1 className="text-2xl font-black text-white flex items-center gap-2">
+            <span className="text-3xl">🗂️</span> Receptionist Dashboard
+          </h1>
+          <p className="text-slate-400 text-sm mt-1 ml-10">
+            Queue management · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        <Link
+          to="/appointments"
+          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-blue-500/20 transform hover:-translate-y-0.5 transition-all flex items-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+          Book Appointment
+        </Link>
       </div>
 
-      {/* ── Quick Stats ──────────────────────────────────────────────────────── */}
+      {/* ── Quick Stats ──────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
         {[
           { label: 'Total', value: stats.total_patients, icon: '📋', color: 'from-blue-600/20 to-blue-500/5 border-blue-500/20' },
@@ -256,7 +317,7 @@ export default function ReceptionistDashboard() {
         ))}
       </div>
 
-      {/* ── Queue Table ──────────────────────────────────────────────────────── */}
+      {/* ── Queue Table ──────────────────────────────────────────────────────────── */}
       <div className="bg-slate-800/60 border border-white/10 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
           <h2 className="font-bold text-white">Today's Queue</h2>
@@ -295,13 +356,14 @@ export default function ReceptionistDashboard() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
-                        <button 
+                        <button
                           onClick={() => fetchPatientDetails(appt.patient_id)}
                           className="hover:text-cyan-400 text-slate-400 transition-colors"
                           title="View Details"
                         >
                           👁
                         </button>
+                        <VitalsIndicator appt={appt} />
                       </div>
                       {appt.reason && (
                         <p className="text-slate-500 text-xs mt-0.5 italic truncate max-w-[180px]">"{appt.reason}"</p>
@@ -354,16 +416,25 @@ export default function ReceptionistDashboard() {
                       <div className="flex items-center gap-2 flex-wrap">
                         {appt.status === 'BOOKED' && (
                           <>
+                            {/* Enter Vitals */}
+                            <button onClick={() => openVitals(appt)} disabled={updating === appt.id}
+                              title="Enter Vitals"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors disabled:opacity-50 text-base">
+                              🩺
+                            </button>
+                            {/* Check-In */}
                             <button onClick={() => updateStatus(appt.id, 'ARRIVED')} disabled={updating === appt.id}
                               title="Check-In"
                               className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors disabled:opacity-50 text-base">
                               📥
                             </button>
+                            {/* Reschedule */}
                             <button onClick={() => openReschedule(appt)} disabled={updating === appt.id}
                               title="Reschedule"
                               className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 text-base">
                               🔁
                             </button>
+                            {/* Cancel */}
                             <button onClick={() => updateStatus(appt.id, 'CANCELLED')} disabled={updating === appt.id}
                               title="Cancel"
                               className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 text-sm">
@@ -372,11 +443,20 @@ export default function ReceptionistDashboard() {
                           </>
                         )}
                         {appt.status === 'ARRIVED' && (
-                          <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
-                            title="Complete"
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 text-sm">
-                            ✔✔
-                          </button>
+                          <>
+                            {/* Enter Vitals (still available after check-in) */}
+                            <button onClick={() => openVitals(appt)} disabled={updating === appt.id}
+                              title="Enter Vitals"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors disabled:opacity-50 text-base">
+                              🩺
+                            </button>
+                            {/* Complete */}
+                            <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
+                              title="Complete"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 text-sm">
+                              ✔✔
+                            </button>
+                          </>
                         )}
                         {['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(appt.status) && (
                           <span className="text-slate-600 text-xs italic">—</span>
@@ -396,10 +476,66 @@ export default function ReceptionistDashboard() {
         )}
       </div>
 
-      {/* ── Create Doctor Panel ───────────────────────────────────────────────── */}
+      {/* ── Create Doctor Panel ─────────────────────────────────────────────────── */}
       <CreateDoctorForm />
 
-      {/* ── Reschedule Modal ──────────────────────────────────────────────────── */}
+      {/* ── Vitals Modal ────────────────────────────────────────────────────────── */}
+      {vitalsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button onClick={() => setVitalsModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl leading-none">
+              ✕
+            </button>
+            <div className="mb-6">
+              <h3 className="font-bold text-white text-xl">🩺 Enter Vitals</h3>
+              <p className="text-slate-400 text-sm mt-1">Record patient vitals before consultation.</p>
+            </div>
+
+            <form onSubmit={submitVitals} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Blood Pressure</label>
+                  <input type="text" value={vitalsForm.bp}
+                    onChange={(e) => setVitalsForm({ ...vitalsForm, bp: e.target.value })}
+                    placeholder="e.g. 120/80" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Heart Rate (bpm)</label>
+                  <input type="number" min="20" max="300" value={vitalsForm.heart_rate}
+                    onChange={(e) => setVitalsForm({ ...vitalsForm, heart_rate: e.target.value })}
+                    placeholder="e.g. 75" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Weight (kg)</label>
+                  <input type="number" step="0.1" min="1" value={vitalsForm.weight}
+                    onChange={(e) => setVitalsForm({ ...vitalsForm, weight: e.target.value })}
+                    placeholder="e.g. 70" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Temperature (°F)</label>
+                  <input type="number" step="0.1" min="90" max="115" value={vitalsForm.temperature}
+                    onChange={(e) => setVitalsForm({ ...vitalsForm, temperature: e.target.value })}
+                    placeholder="e.g. 98.6" className={inputCls} />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6 pt-2">
+                <button type="button" onClick={() => setVitalsModal(null)}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingVitals}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-teal-600 to-cyan-500 text-white disabled:opacity-50 shadow-lg shadow-teal-600/20 transition-all hover:-translate-y-0.5">
+                  {savingVitals ? 'Saving...' : '🩺 Save Vitals'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reschedule Modal ──────────────────────────────────────────────────────── */}
       {rescheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
@@ -411,7 +547,7 @@ export default function ReceptionistDashboard() {
               <h3 className="font-bold text-white text-xl">🔁 Reschedule</h3>
               <p className="text-slate-400 text-sm mt-1">Change the date and time of this appointment.</p>
             </div>
-            
+
             <form onSubmit={submitReschedule} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">New Date</label>
@@ -441,52 +577,106 @@ export default function ReceptionistDashboard() {
         </div>
       )}
 
-      {/* ── Patient Info Modal ────────────────────────────────────────────────── */}
+      {/* ── Patient Loading Overlay ──────────────────────────────────────────────── */}
+      {fetchingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-800 rounded-2xl p-8 flex flex-col items-center gap-3">
+            <svg className="animate-spin w-8 h-8 text-cyan-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <p className="text-slate-300 text-sm">Loading patient data...</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Patient Info Modal ────────────────────────────────────────────────────── */}
       {patientModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button onClick={() => setPatientModal(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl leading-none">
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl leading-none z-10">
               ✕
             </button>
-            <div className="mb-6">
+
+            {/* Patient Header */}
+            <div className="bg-gradient-to-br from-slate-700/60 to-slate-800 px-6 pt-6 pb-4 rounded-t-2xl">
               <h3 className="font-bold text-white text-xl">{patientModal.name}</h3>
-              <p className="text-slate-400 text-sm">{patientModal.age} years old · {patientModal.contact}</p>
-            </div>
-            
-            <div className="space-y-4 text-sm mb-6">
-              <div className="bg-white/5 rounded-lg p-3">
-                <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medical History</span>
-                <p className="text-slate-300">{patientModal.medical_history || 'None provided'}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/5 rounded-lg p-3">
-                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Allergies</span>
-                  <p className="text-slate-300">{patientModal.allergies || 'None'}</p>
-                </div>
-                <div className="bg-white/5 rounded-lg p-3">
-                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medication</span>
-                  <p className="text-slate-300">{patientModal.current_medication || 'None'}</p>
-                </div>
+              <div className="flex flex-wrap gap-3 text-sm text-slate-400 mt-1">
+                {patientModal.age && <span>🎂 {patientModal.age} yrs</span>}
+                {patientModal.gender && <span>· {patientModal.gender}</span>}
+                {patientModal.blood_group && (
+                  <span className="px-2 py-0.5 bg-red-500/20 text-red-300 rounded text-xs font-bold border border-red-500/20">
+                    🩸 {patientModal.blood_group}
+                  </span>
+                )}
+                {patientModal.contact && <span>📞 {patientModal.contact}</span>}
               </div>
             </div>
 
-            <div className="border-t border-white/10 pt-4">
-              <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Recent Appointments</span>
-              {patientModal.recent_appointments.length > 0 ? (
-                <ul className="space-y-2">
-                  {patientModal.recent_appointments.map((ra, idx) => (
-                    <li key={idx} className="flex justify-between items-center text-sm bg-white/5 px-3 py-2 rounded-lg text-slate-300">
-                      <span>{ra.date}</span>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[ra.status] || 'bg-slate-600 text-slate-300'}`}>
-                        {ra.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-slate-500 text-sm italic">No recent history.</p>
+            <div className="p-6 space-y-4">
+              {/* Medical info */}
+              <div className="space-y-3 text-sm">
+                <div className="bg-white/5 rounded-lg p-3">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medical History</span>
+                  <p className="text-slate-300">{patientModal.medical_history || 'None provided'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Allergies</span>
+                    <p className="text-slate-300">{patientModal.allergies || 'None'}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Medication</span>
+                    <p className="text-slate-300">{patientModal.current_medication || 'None'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lab Reports */}
+              {patientModal.lab_reports && patientModal.lab_reports.length > 0 && (
+                <div className="border-t border-white/10 pt-4">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">🧪 Lab Reports</span>
+                  <ul className="space-y-2">
+                    {patientModal.lab_reports.map((report, idx) => (
+                      <li key={idx}>
+                        <a href={report.file_url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors group">
+                          <span className="text-sm text-slate-300 font-medium">{report.title}</span>
+                          <span className="text-xs text-cyan-400 group-hover:text-cyan-300">Open ↗</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
+
+              {/* Recent Visits */}
+              <div className="border-t border-white/10 pt-4">
+                <span className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">🕐 Recent Visits</span>
+                {patientModal.recent_appointments && patientModal.recent_appointments.length > 0 ? (
+                  <ul className="space-y-2">
+                    {patientModal.recent_appointments.map((ra, idx) => (
+                      <li key={idx} className="bg-white/5 px-3 py-2.5 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-300">{ra.date}</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[ra.status] || 'bg-slate-600 text-slate-300'}`}>
+                            {ra.status}
+                          </span>
+                        </div>
+                        {ra.prescription_summary && (
+                          <p className="text-xs text-purple-300 mt-1">💊 {ra.prescription_summary}</p>
+                        )}
+                        {ra.doctor_notes && (
+                          <p className="text-xs text-slate-500 italic mt-0.5 truncate">📝 {ra.doctor_notes}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-slate-500 text-sm italic">No recent history.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
