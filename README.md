@@ -227,10 +227,3 @@ npm run dev
 - `POST /api/patient/profile/`: One-time patient medical history setup.
 
 ---
-
-## 📝 License
-This project is for educational and operational demonstration purposes.
-
----
-
-*Built with ❤️ by [Your Name/Repo Owner]*
