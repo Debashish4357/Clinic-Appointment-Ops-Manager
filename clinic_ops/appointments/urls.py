@@ -6,7 +6,7 @@ from .views import (
     DailyPatientsView, RevenueView,
     AdminDashboardView, DoctorDashboardView,
     ReceptionistDashboardView, PatientDashboardView,
-    DoctorListView,
+    DoctorListView, LabReportView,
 )
 
 urlpatterns = [
@@ -31,4 +31,8 @@ urlpatterns = [
     path('dashboard/doctor/', DoctorDashboardView.as_view(), name='dashboard_doctor'),
     path('dashboard/receptionist/', ReceptionistDashboardView.as_view(), name='dashboard_receptionist'),
     path('dashboard/patient/', PatientDashboardView.as_view(), name='dashboard_patient'),
+
+    # Lab Reports
+    path('patient/lab-reports/', LabReportView.as_view(), name='patient_lab_reports'),
+    path('patient/lab-reports/<int:pk>/', LabReportView.as_view(), name='patient_lab_report_detail'),
 ]

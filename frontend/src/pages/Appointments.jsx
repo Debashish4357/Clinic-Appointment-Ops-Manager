@@ -571,7 +571,7 @@ export default function Appointments() {
                                       {updating === appt.id ? 'Cancelling...' : 'Cancel'}
                                     </button>
                                   )}
-                                  {role === 'DOCTOR' && appt.status === 'BOOKED' && (
+                                  {role === 'DOCTOR' && ['BOOKED', 'ARRIVED', 'IN_PROGRESS'].includes(appt.status) && (
                                     <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
                                       className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-40 whitespace-nowrap">
                                       {updating === appt.id ? '...' : 'Mark Completed'}
@@ -583,7 +583,7 @@ export default function Appointments() {
                                       {updating === appt.id ? '...' : 'Cancel Appointment'}
                                     </button>
                                   )}
-                                  {role === 'ADMIN' && appt.status === 'BOOKED' && (
+                                  {role === 'ADMIN' && ['BOOKED', 'ARRIVED', 'IN_PROGRESS'].includes(appt.status) && (
                                     <>
                                       <button onClick={() => updateStatus(appt.id, 'COMPLETED')} disabled={updating === appt.id}
                                         className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors disabled:opacity-40">

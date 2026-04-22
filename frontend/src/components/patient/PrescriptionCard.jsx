@@ -4,7 +4,10 @@ import React, { useState } from 'react';
 function printPrescription(appt) {
   const meds = Array.isArray(appt.prescription) ? appt.prescription : [];
   const win = window.open('', '_blank');
-  if (!win) return;
+  if (!win) {
+    alert("Please allow pop-ups to download your prescription.");
+    return;
+  }
   win.document.write(`
     <html><head><title>Prescription — ${appt.date}</title>
     <style>
@@ -15,8 +18,14 @@ function printPrescription(appt) {
       th{background:#f1f5f9;text-align:left;padding:8px 12px;font-size:12px;text-transform:uppercase}
       td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:14px}
       .advice{margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px}
-      @media print{button{display:none}}
+      @media print{
+        body * { visibility: hidden; }
+        .prescription-container, .prescription-container * { visibility: visible; }
+        .prescription-container { position: absolute; left: 0; top: 0; width: 100%; }
+        button { display: none; }
+      }
     </style></head><body>
+    <div class="prescription-container">
     <h1>Prescription</h1>
     <div class="meta">
       Doctor: ${appt.doctor_name || `#${appt.doctor}`} &nbsp;|&nbsp;
@@ -29,7 +38,7 @@ function printPrescription(appt) {
         </tr></thead>
         <tbody>
           ${meds.map(m => `<tr>
-            <td>${m.name || '—'}</td>
+            <td>${m.medicine || m.name || '—'}</td>
             <td>${m.dosage || '—'}</td>
             <td>${m.frequency || '—'}</td>
             <td>${m.duration || '—'}</td>
@@ -39,7 +48,17 @@ function printPrescription(appt) {
       </table>` : '<p style="color:#888">No medicines listed.</p>'}
     ${appt.advice ? `<div class="advice"><strong>Doctor's Advice:</strong><p>${appt.advice}</p></div>` : ''}
     ${appt.doctor_remark ? `<div class="advice"><strong>Remarks:</strong><p>${appt.doctor_remark}</p></div>` : ''}
-    <script>window.print();window.close();</script>
+    </div> <!-- Close prescription-container -->
+    <script>
+      window.onload = function() {
+        setTimeout(function() {
+          window.print();
+        }, 250);
+      };
+      window.onafterprint = function() {
+        window.close();
+      };
+    </script>
     </body></html>
   `);
   win.document.close();
@@ -81,7 +100,7 @@ export default function PrescriptionCard({ appt }) {
             {(expanded ? meds : meds.slice(0, 2)).map((med, i) => (
               <div key={i} className="flex flex-wrap items-start gap-2 rounded-xl border border-white/5 bg-slate-900/60 px-3 py-2.5">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-white text-sm">{med.name || '—'}</p>
+                  <p className="font-semibold text-white text-sm">{med.medicine || med.name || '—'}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                     {med.dosage     && <span className="text-xs text-slate-400">💊 {med.dosage}</span>}
                     {med.frequency  && <span className="text-xs text-slate-400">🔁 {med.frequency}</span>}

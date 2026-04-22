@@ -135,13 +135,23 @@ function AppCard({ appt, onCancelled, onBook }) {
   );
 }
 
-export default function UpcomingAppointments({ appointments, onCancel, onBook }) {
+export default function UpcomingAppointments({ appointments, onCancel, onBook, filterMode = 'upcoming' }) {
   const today    = new Date().toISOString().slice(0, 10);
   const todayObj = new Date(today + 'T00:00:00');
 
   const active = appointments
     .filter(a => {
       const d = new Date(a.date + 'T00:00:00');
+      if (filterMode === 'today') {
+        return d.getTime() === todayObj.getTime() && !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status);
+      }
+      if (filterMode === 'previous') {
+        return ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) || d < todayObj;
+      }
+      if (filterMode === 'all') {
+        return true;
+      }
+      // default: upcoming
       return !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) && d >= todayObj;
     })
     .sort((a, b) => {
@@ -153,12 +163,26 @@ export default function UpcomingAppointments({ appointments, onCancel, onBook })
       return new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time);
     });
 
+  const upcomingList = active.filter(a => {
+    const d = new Date(a.date + 'T00:00:00');
+    return !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) && d >= todayObj;
+  });
+
+  const previousList = active.filter(a => {
+    const d = new Date(a.date + 'T00:00:00');
+    return ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) || d < todayObj;
+  });
+
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black text-white">Upcoming Appointments</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Your scheduled & active visits</p>
+          <h2 className="text-lg font-black text-white">
+            {filterMode === 'today' ? "Today's Appointments" : filterMode === 'all' ? "Appointment History" : filterMode === 'previous' ? "History" : "Upcoming Appointments"}
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {filterMode === 'all' ? "Your previous and upcoming visits" : filterMode === 'previous' ? "Your past appointments" : "Your scheduled & active visits"}
+          </p>
         </div>
         {active.length > 0 && (
           <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2.5 py-0.5 text-xs font-bold text-blue-300">
@@ -168,10 +192,31 @@ export default function UpcomingAppointments({ appointments, onCancel, onBook })
       </div>
 
       {active.length > 0 ? (
-        <div className="space-y-3">
-          {active.map(a => (
-            <AppCard key={a.id} appt={a} onCancelled={onCancel} onBook={onBook} />
-          ))}
+        <div className="space-y-6">
+          {filterMode === 'all' ? (
+            <>
+              {upcomingList.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Upcoming</h3>
+                  <div className="space-y-3">
+                    {upcomingList.map(a => <AppCard key={a.id} appt={a} onCancelled={onCancel} onBook={onBook} />)}
+                  </div>
+                </div>
+              )}
+              {previousList.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 mt-6">Previous</h3>
+                  <div className="space-y-3">
+                    {previousList.map(a => <AppCard key={a.id} appt={a} onCancelled={onCancel} onBook={onBook} />)}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-3">
+              {active.map(a => <AppCard key={a.id} appt={a} onCancelled={onCancel} onBook={onBook} />)}
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 bg-slate-900/50 px-6 py-14 text-center">
@@ -181,17 +226,21 @@ export default function UpcomingAppointments({ appointments, onCancel, onBook })
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <p className="text-slate-300 font-bold text-base">No upcoming appointments</p>
-          <p className="text-slate-500 text-sm mt-1">Ready to see a doctor? Book your visit today.</p>
-          <button
-            onClick={onBook}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-2.5 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-400 transition shadow-lg shadow-cyan-500/20"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            Book Appointment
-          </button>
+          <p className="text-slate-300 font-bold text-base">No appointments found</p>
+          {filterMode !== 'all' && filterMode !== 'previous' && (
+            <>
+              <p className="text-slate-500 text-sm mt-1">Ready to see a doctor? Book your visit today.</p>
+              <button
+                onClick={onBook}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-2.5 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-400 transition shadow-lg shadow-cyan-500/20"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                Book Appointment
+              </button>
+            </>
+          )}
         </div>
       )}
     </section>

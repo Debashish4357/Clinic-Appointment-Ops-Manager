@@ -188,7 +188,8 @@ class PatientDetailView(APIView):
             return Response({'message': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         # Get top 3 recent appointments
-        from appointments.models import Appointment
+        from appointments.models import Appointment, LabReport
+        from appointments.serializers import LabReportSerializer
         recent_appts = Appointment.objects.filter(patient=patient).order_by('-date', '-time')[:3]
         recent_list = []
         for appt in recent_appts:
@@ -205,6 +206,9 @@ class PatientDetailView(APIView):
                 'prescription_summary': presc_summary,
                 'doctor_notes': appt.doctor_notes or '',
             })
+            
+        reports = LabReport.objects.filter(patient=patient)
+        reports_data = LabReportSerializer(reports, many=True, context={'request': request}).data
 
         data = {
             'name': patient.user.get_full_name() or patient.user.username,
@@ -215,7 +219,8 @@ class PatientDetailView(APIView):
             'medical_history': patient.medical_history,
             'allergies': patient.allergies,
             'current_medication': patient.current_medication,
-            'lab_reports': patient.lab_reports or [],
+            'insurance_info': patient.insurance_info,
+            'lab_reports': reports_data,
             'recent_appointments': recent_list,
         }
         return Response(data, status=status.HTTP_200_OK)
@@ -256,6 +261,7 @@ class PatientProfileView(APIView):
             'medical_history': patient.medical_history,
             'allergies': patient.allergies,
             'current_medication': patient.current_medication,
+            'insurance_info': patient.insurance_info,
             'address': patient.address,
             'profile_image': _build_profile_image_url(request, patient),
             'profile_completed': patient.profile_completed,
@@ -303,6 +309,8 @@ class PatientProfileView(APIView):
             patient.allergies = data['allergies']
         if data.get('current_medication') is not None:
             patient.current_medication = data['current_medication']
+        if data.get('insurance_info') is not None:
+            patient.insurance_info = data['insurance_info']
         if data.get('address') is not None:
             patient.address = data['address']
 

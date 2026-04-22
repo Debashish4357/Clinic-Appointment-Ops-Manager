@@ -15,19 +15,48 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   useEffect(() => {
-    if (open) { setForm(profile || {}); setErr(''); }
+    if (open) {
+      setForm(profile || {});
+      setErr('');
+      setImageFile(null);
+      setImagePreview(profile?.profile_image || null);
+    }
   }, [open, profile]);
 
   if (!open) return null;
 
   const iCls = 'w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm text-white focus:border-cyan-500 focus:outline-none';
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true); setErr('');
     try {
-      await API.patch('patient/profile/', form);
+      const fd = new FormData();
+      Object.keys(form).forEach(k => {
+        if (form[k] !== null && form[k] !== undefined) {
+          fd.append(k, form[k]);
+        }
+      });
+      if (imageFile) {
+        fd.append('profile_image', imageFile);
+      }
+
+      await API.patch('patient/profile/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       onSaved?.();
       onClose();
     } catch (e) {
@@ -38,54 +67,85 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
       onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <h2 className="font-black text-white text-lg">Edit Profile</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
-        <div className="px-6 py-5 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
           {err && <div className="text-sm text-red-400 bg-red-500/10 rounded-xl px-4 py-2">{err}</div>}
+
+          {/* Profile Picture Upload */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative">
+              <div className="h-24 w-24 overflow-hidden rounded-full border-2 border-slate-700 bg-slate-800 flex items-center justify-center">
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-3xl text-slate-500">👤</span>
+                )}
+              </div>
+              <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-cyan-500 text-white shadow-lg hover:bg-cyan-400 transition">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              </label>
+              <input type="file" id="avatar-upload" className="hidden" accept="image/*" onChange={handleImageChange} />
+            </div>
+            <p className="text-xs text-slate-500">Update Profile Picture</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              ['Age', 'age', 'number', '28'],
+              ['Contact', 'contact', 'text', '+91 9876543210'],
+              ['Emergency Contact', 'emergency_contact', 'text', '+91 9876543211'],
+              ['Blood Group', 'blood_group', 'select', ['A+','A-','B+','B-','O+','O-','AB+','AB-']],
+              ['Gender', 'gender', 'select', [['MALE','Male'],['FEMALE','Female'],['OTHER','Other']]],
+            ].map(([label, key, type, options]) => (
+              <div key={key}>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</label>
+                {type === 'select' ? (
+                  <select value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={iCls}>
+                    <option value="">Select</option>
+                    {typeof options[0] === 'string' 
+                      ? options.map(o => <option key={o} value={o}>{o}</option>)
+                      : options.map(([val, text]) => <option key={val} value={val}>{text}</option>)}
+                  </select>
+                ) : (
+                  <input type={type} placeholder={options} value={form[key] || ''}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={iCls} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Full width fields */}
           {[
-            ['Contact', 'contact', 'text', '+91 9876543210'],
-            ['Age', 'age', 'number', '28'],
-            ['Emergency Contact', 'emergency_contact', 'text', '+91 9876543211'],
             ['Address', 'address', 'text', '123 Main St, City'],
+            ['Medical History', 'medical_history', 'textarea', 'Records of past illnesses, surgeries, and family medical background.'],
+            ['Allergies', 'allergies', 'textarea', 'Known sensitivities to medications or food.'],
+            ['Current Medications', 'current_medication', 'textarea', 'A list of active prescriptions and dosages.'],
+            ['Insurance Info', 'insurance_info', 'textarea', 'Insurance provider, policy number, etc.'],
           ].map(([label, key, type, ph]) => (
             <div key={key}>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</label>
-              <input type={type} placeholder={ph} value={form[key] || ''}
-                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                className={iCls} />
+              {type === 'textarea' ? (
+                <textarea placeholder={ph} value={form[key] || ''} rows={2}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={iCls} />
+              ) : (
+                <input type={type} placeholder={ph} value={form[key] || ''}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={iCls} />
+              )}
             </div>
           ))}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Gender</label>
-            <select value={form.gender || ''} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}
-              className={iCls}>
-              <option value="">Select</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Blood Group</label>
-            <select value={form.blood_group || ''} onChange={e => setForm(f => ({ ...f, blood_group: e.target.value }))}
-              className={iCls}>
-              <option value="">Select</option>
-              {['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(g => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </div>
+
         </div>
         <div className="flex gap-3 border-t border-white/10 px-6 py-4">
-          <button onClick={onClose} className="flex-1 rounded-xl border border-white/10 bg-slate-800 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-white/10 bg-slate-800 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition">
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 py-2.5 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50">
+            className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 py-2.5 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 transition shadow-lg shadow-cyan-500/20 active:scale-95">
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
@@ -95,7 +155,7 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
 }
 
 /* ─── Profile Dropdown ───────────────────────────────────────────── */
-function ProfileDropdown({ name, onEditProfile, onLogout }) {
+function ProfileDropdown({ name, profileImage, onEditProfile, onLogout }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -111,9 +171,13 @@ function ProfileDropdown({ name, onEditProfile, onLogout }) {
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 hover:bg-white/10 transition"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-black">
-          {name?.[0]?.toUpperCase() || 'P'}
-        </div>
+        {profileImage ? (
+          <img src={profileImage} alt="Profile" className="h-7 w-7 rounded-full object-cover" />
+        ) : (
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-black">
+            {name?.[0]?.toUpperCase() || 'P'}
+          </div>
+        )}
         <div className="hidden sm:block text-left">
           <p className="text-xs font-bold text-white leading-tight">{name || 'Patient'}</p>
           <p className="text-[10px] text-slate-500">Patient</p>
@@ -190,6 +254,7 @@ export default function PatientDashboard() {
 
   const [profile,      setProfile]      = useState({});
   const [appointments, setAppointments] = useState([]);
+  const [labReports,   setLabReports]   = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState('');
   const [activePage,   setActivePage]   = useState('dashboard'); // 'dashboard' | 'appointments'
@@ -207,6 +272,7 @@ export default function PatientDashboard() {
       setProfile(data.profile || {});
       // Merge patients_appointments (all) if available
       setAppointments(data.patients_appointments || data.appointments || []);
+      setLabReports(data.lab_reports || []);
     } catch {
       setError('Failed to load dashboard data. Please refresh.');
     } finally {
@@ -262,6 +328,7 @@ export default function PatientDashboard() {
           {/* Profile dropdown */}
           <ProfileDropdown
             name={profileName}
+            profileImage={profile.profile_image}
             onEditProfile={() => setEditProfileOpen(true)}
             onLogout={handleLogout}
           />
@@ -296,13 +363,13 @@ export default function PatientDashboard() {
 
             {/* LEFT — 8 cols */}
             <div className="space-y-8 lg:col-span-8">
-              {/* Show all appointments on Appointments page, otherwise only upcoming */}
               <UpcomingAppointments
-                appointments={activePage === 'appointments' ? appointments : appointments}
+                appointments={appointments}
+                filterMode={activePage === 'appointments' ? 'previous' : 'upcoming'}
                 onCancel={loadData}
                 onBook={() => setBookingOpen(true)}
               />
-              <HealthHistory appointments={appointments} />
+              {activePage === 'appointments' && <HealthHistory appointments={appointments} labReports={labReports} onReportsChanged={loadData} />}
             </div>
 
             {/* RIGHT — 4 cols */}

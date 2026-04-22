@@ -40,3 +40,15 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"Token {self.token_number} | {self.patient} with Dr. {self.doctor} on {self.date}"
+
+class LabReport(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='lab_reports')
+    title = models.CharField(max_length=255)
+    file = models.FileField(upload_to='lab_reports/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"{self.title} - {self.patient}"

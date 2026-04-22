@@ -5,8 +5,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import Appointment
-from .serializers import AppointmentSerializer
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .models import Appointment, LabReport
+from .serializers import AppointmentSerializer, LabReportSerializer
 from users.models import User, Doctor, Patient
 
 
@@ -48,6 +49,9 @@ class AppointmentView(APIView):
 
     # ── POST /api/appointments/ ────────────────────────────────────────────────
     def post(self, request):
+        print("=== BACKEND REQUEST BODY ===")
+        print(request.data)
+        
         role = request.user.role
 
         # Fix 1: PATIENT books for themselves; RECEPTIONIST/ADMIN can book for any patient
@@ -55,27 +59,36 @@ class AppointmentView(APIView):
             try:
                 patient = Patient.objects.get(user=request.user)
             except Patient.DoesNotExist:
+                print("Error: Patient profile not found.")
                 return Response(
                     {'message': 'Patient profile not found for this user.'},
                     status=status.HTTP_404_NOT_FOUND
                 )
             # Check if patient profile is completed
             if not patient.profile_completed:
+                print("Error: Patient profile incomplete.")
                 return Response(
                     {'message': 'Please complete your profile before booking.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         elif role in ['RECEPTIONIST', 'ADMIN']:
-            patient_id = request.data.get('patient_id')
-            if not patient_id:
-                return Response(
-                    {'message': 'patient_id is required for receptionist/admin booking.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            try:
-                patient = Patient.objects.get(id=patient_id)
-            except Patient.DoesNotExist:
-                return Response({'message': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
+            if request.data.get('is_walk_in'):
+                import uuid
+                walk_in_name = request.data.get('walk_in_name', 'Walk-in Patient')
+                dummy_username = f"walkin_{uuid.uuid4().hex[:8]}"
+                user = User.objects.create(username=dummy_username, first_name=walk_in_name, role='PATIENT')
+                patient = Patient.objects.create(user=user, profile_completed=True)
+            else:
+                patient_id = request.data.get('patient_id') or request.data.get('patient')
+                if not patient_id:
+                    return Response(
+                        {'message': 'patient_id or patient is required for receptionist/admin booking.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                try:
+                    patient = Patient.objects.get(id=patient_id)
+                except Patient.DoesNotExist:
+                    return Response({'message': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
         else:
             return Response({'message': 'Unauthorized role.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -87,6 +100,7 @@ class AppointmentView(APIView):
 
         # Validate required fields
         if not all([doctor_id, appt_date, appt_time]):
+            print("Error: Missing required fields.")
             return Response(
                 {'message': 'doctor, date, and time are required.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -102,15 +116,17 @@ class AppointmentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Prevent booking in past date/time
-        if datetime.combine(appt_date_obj, appt_time_obj) < datetime.now():
+        is_walk_in = request.data.get('is_walk_in', False)
+
+        # Prevent booking in past date/time (skip strict check for walk-ins)
+        if not is_walk_in and datetime.combine(appt_date_obj, appt_time_obj) < datetime.now():
             return Response(
                 {'message': 'Cannot book an appointment in the past.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Ensure appointment is within doctor available time (Assume 09:00 - 17:00)
-        if not (time(9, 0) <= appt_time_obj <= time(17, 0)):
+        if not is_walk_in and not (time(9, 0) <= appt_time_obj <= time(17, 0)):
             return Response(
                 {'message': 'Doctor is only available between 09:00 and 17:00.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -122,10 +138,9 @@ class AppointmentView(APIView):
         except Doctor.DoesNotExist:
             return Response({'message': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Prevent double booking (same doctor, date, and time)
         if Appointment.objects.filter(doctor=doctor, date=appt_date, time=appt_time).exclude(status='CANCELLED').exists():
             return Response(
-                {'message': 'Doctor is already booked for this date and time.'},
+                {'message': 'Time slot already booked'},
                 status=status.HTTP_409_CONFLICT
             )
 
@@ -147,6 +162,8 @@ class AppointmentView(APIView):
             reason=reason,
             appointment_type=appointment_type,
         )
+        print("=== DB SAVE RESULT ===")
+        print(f"Appointment created: ID={appointment.id}, Status={appointment.status}, Token={token_number}")
 
         return Response({
             'message': 'Appointment booked successfully.',
@@ -673,9 +690,17 @@ class ReceptionistDashboardView(APIView):
         if request.user.role not in ['RECEPTIONIST', 'ADMIN']:
             return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        today = date.today()
+        date_param = request.query_params.get('date')
+        if date_param:
+            try:
+                target_date = parse_date(date_param)
+            except Exception:
+                target_date = date.today()
+        else:
+            target_date = date.today()
+
         today_appointments = Appointment.objects.filter(
-            date=today
+            date=target_date
         ).select_related(
             'patient', 'patient__user', 'doctor', 'doctor__user'
         ).order_by('token_number')
@@ -691,11 +716,13 @@ class ReceptionistDashboardView(APIView):
                 'time': str(appt.time),
                 'patient_id': appt.patient.id,
                 'patient_name': patient_user.get_full_name() or patient_user.username,
+                'patient_phone': appt.patient.contact or '',
                 'doctor_name': f'Dr. {doctor_user.get_full_name() or doctor_user.username}',
                 'status': appt.status,
                 'reason': appt.reason,
                 'appointment_type': appt.appointment_type,
                 'estimated_wait_time': appt.estimated_wait_time,
+                'date': str(appt.date),
                 # Vitals
                 'bp': appt.bp or '',
                 'heart_rate': appt.heart_rate or '',
@@ -743,6 +770,9 @@ class PatientDashboardView(APIView):
         if patient.profile_image:
             profile_image_url = request.build_absolute_uri(patient.profile_image.url)
 
+        reports = LabReport.objects.filter(patient=patient)
+        reports_data = LabReportSerializer(reports, many=True, context={'request': request}).data
+
         data = {
             'profile': {
                 'name':               request.user.get_full_name() or request.user.username,
@@ -763,6 +793,51 @@ class PatientDashboardView(APIView):
             'upcoming_appointment': AppointmentSerializer(upcoming).data if upcoming else None,
             'token_number': upcoming.token_number if upcoming else None,
             'estimated_wait_time': upcoming.estimated_wait_time if upcoming else None,
+            'lab_reports': reports_data,
         }
         return Response({'message': 'Success', 'data': data})
+
+class LabReportView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request):
+        if request.user.role != 'PATIENT':
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            patient = Patient.objects.get(user=request.user)
+            reports = LabReport.objects.filter(patient=patient)
+            serializer = LabReportSerializer(reports, many=True, context={'request': request})
+            return Response({'message': 'Success', 'data': serializer.data})
+        except Patient.DoesNotExist:
+            return Response({'message': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        if request.user.role != 'PATIENT':
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            patient = Patient.objects.get(user=request.user)
+        except Patient.DoesNotExist:
+            return Response({'message': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = LabReportSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(patient=patient)
+            return Response({'message': 'Lab report uploaded successfully.', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({'message': 'Validation failed', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        if request.user.role != 'PATIENT':
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            patient = Patient.objects.get(user=request.user)
+            report = LabReport.objects.get(pk=pk, patient=patient)
+            report.file.delete(save=False)
+            report.delete()
+            return Response({'message': 'Lab report deleted successfully.'}, status=status.HTTP_200_OK)
+        except (Patient.DoesNotExist, LabReport.DoesNotExist):
+            return Response({'message': 'Report not found.'}, status=status.HTTP_404_NOT_FOUND)
 

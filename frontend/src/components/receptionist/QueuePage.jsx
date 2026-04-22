@@ -11,7 +11,7 @@ const STATUS_STYLES = {
   NO_SHOW:     'bg-slate-500/20 text-slate-300 border border-slate-500/30',
 };
 
-const FILTER_TABS = ['All', 'BOOKED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const FILTER_TABS = ['Active', 'All', 'BOOKED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 function QueueBanner({ appointments }) {
   const serving  = appointments.find(a => a.status === 'IN_PROGRESS' || a.status === 'ARRIVED');
@@ -55,8 +55,8 @@ function ActionBtn({ label, color, onClick, disabled }) {
   );
 }
 
-export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn, loadingAppts }) {
-  const [filter,    setFilter]    = useState('All');
+export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn, loadingAppts, selectedDate, onDateChange }) {
+  const [filter,    setFilter]    = useState('Active');
   const [search,    setSearch]    = useState('');
   const [updating,  setUpdating]  = useState(null);
   const [vitalsFor, setVitalsFor] = useState(null);
@@ -70,7 +70,7 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
   useEffect(() => {
     // Polling every 10 seconds
     const intervalId = setInterval(() => {
-      onRefresh(false); // pass false if we don't want a hard loading spinner
+      onRefresh(true); // pass true for silent reload without showing loading spinner
     }, 10000);
 
     // Timer for "Updated X sec ago"
@@ -86,15 +86,17 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
     setLastUpdated(0);
   }, [appointments]);
 
-  const todayOnly = appointments.filter(a => {
-    const today = new Date().toISOString().slice(0, 10);
-    return a.date === today;
-  });
-
-  const filtered = todayOnly.filter(a => {
-    const matchStatus = filter === 'All' || a.status === filter;
+  const filtered = appointments.filter(a => {
+    let matchStatus = false;
+    if (filter === 'Active') {
+      matchStatus = ['BOOKED', 'ARRIVED', 'IN_PROGRESS'].includes(a.status);
+    } else if (filter === 'All') {
+      matchStatus = true;
+    } else {
+      matchStatus = a.status === filter;
+    }
     const q = search.toLowerCase();
-    const matchSearch = !q || a.patient_name?.toLowerCase().includes(q) || a.contact?.toLowerCase().includes(q);
+    const matchSearch = !q || a.patient_name?.toLowerCase().includes(q) || a.patient_phone?.toLowerCase().includes(q);
     return matchStatus && matchSearch;
   });
 
@@ -104,20 +106,19 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
       // Don't trigger if typing in input/textarea
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
       
-      const pending = todayOnly.filter(a => a.status === 'BOOKED');
-      const arrived = todayOnly.filter(a => a.status === 'ARRIVED');
+      const pending = appointments.filter(a => a.status === 'BOOKED');
+      const arrived = appointments.filter(a => a.status === 'ARRIVED');
       
       if (e.key.toLowerCase() === 'a') {
         if (pending.length > 0 && !updating) updateStatus(pending[0].id, 'ARRIVED');
       }
       if (e.key.toLowerCase() === 'n') {
-        // "Next" implies finishing current and starting next. Or simply marking first arrived as in_progress
         if (arrived.length > 0 && !updating) updateStatus(arrived[0].id, 'IN_PROGRESS');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [todayOnly, updating]);
+  }, [appointments, updating]);
 
   /* ── actions ───────────────────────────────────────────────────── */
   const updateStatus = async (id, status) => {
@@ -168,20 +169,18 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
         <div>
           <h1 className="text-2xl font-black text-white drop-shadow-sm">Queue Management</h1>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-slate-400 text-sm font-medium">Today's appointment queue</p>
+            <p className="text-slate-400 text-sm font-medium">Daily appointment queue</p>
             <div className="h-1 w-1 rounded-full bg-slate-600"></div>
             <p className="text-slate-500 text-xs italic">Updated {lastUpdated}s ago</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={onWalkIn}
-            className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition shadow-lg shadow-amber-500/5">
-            <span>+</span> Walk-in
-          </button>
-          <button onClick={onBooking}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-400 transition shadow-lg shadow-cyan-500/20">
-            <span>+</span> Book
-          </button>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input 
+            type="date" 
+            value={selectedDate} 
+            onChange={(e) => onDateChange(e.target.value)}
+            className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-slate-300 focus:border-cyan-500 focus:outline-none transition shadow-sm"
+          />
           <button onClick={() => { setLastUpdated(0); onRefresh(true); }}
             className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white transition shadow-sm">
             ↻
@@ -190,7 +189,7 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
       </div>
 
       {/* Queue banner */}
-      <QueueBanner appointments={todayOnly} />
+      <QueueBanner appointments={appointments} />
 
       {/* Search + Filter */}
       <div className="flex flex-wrap items-center gap-3">
@@ -226,7 +225,7 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
                <div key={i} className="h-16 bg-white/5 animate-pulse rounded-xl border border-white/5"></div>
              ))}
            </div>
-        ) : filtered.length > 0 ? (
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
@@ -256,6 +255,7 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
                       <div className="flex items-center gap-3">
                         <div>
                           <p className="font-bold text-white text-base">{appt.patient_name}</p>
+                          {appt.patient_phone && <p className="text-xs text-slate-400 mt-0.5">{appt.patient_phone}</p>}
                           {appt.reason && <p className="text-xs text-slate-400 italic truncate max-w-[180px] mt-0.5">"{appt.reason}"</p>}
                         </div>
                         <button onClick={() => fetchPatient(appt.patient_id)}
@@ -347,26 +347,16 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
                     </td>
                   </tr>
                 )})}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-5 py-10 text-center">
+                      <p className="text-slate-400 font-medium">No patients found</p>
+                      <p className="text-slate-500 text-xs mt-1">There are no appointments matching your current view.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-inner mb-4">
-              <svg className="w-10 h-10 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <p className="text-lg font-bold text-white">No patients in queue</p>
-            <p className="text-slate-400 text-sm mt-1 mb-6">There are no appointments matching your current view.</p>
-            <div className="flex gap-3">
-              <button onClick={onWalkIn} className="rounded-xl bg-white/10 border border-white/10 px-5 py-2.5 text-sm font-bold text-white hover:bg-white/20 transition shadow-sm">
-                + Add Walk-in
-              </button>
-              <button onClick={onBooking} className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:from-cyan-500 hover:to-blue-500 transition shadow-md">
-                + Book Appointment
-              </button>
-            </div>
           </div>
         )}
       </div>

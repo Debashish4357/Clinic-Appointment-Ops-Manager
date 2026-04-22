@@ -10,7 +10,10 @@ const ALL_SLOTS = Array.from({ length: 17 }, (_, i) => {
   return `${String(h).padStart(2, '0')}:${m}`;
 });
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const EMPTY = { doctor: '', date: todayStr(), time: '', reason: '', visitType: 'NEW' };
 
 export default function BookingModal({ open, onClose, onSuccess, prefill = null }) {
@@ -75,14 +78,21 @@ export default function BookingModal({ open, onClose, onSuccess, prefill = null 
   const handleSubmit = async () => {
     setLoading(true); setError('');
     try {
-      await API.post('appointments/', {
+      const payload = {
         doctor: form.doctor, date: form.date,
         time: form.time, reason: form.reason,
-        visit_type: form.visitType,
-      });
+        appointment_type: form.visitType,
+      };
+      console.log("=== FRONTEND REQUEST ===");
+      console.log("POST /api/appointments/", payload);
+      
+      await API.post('appointments/', payload);
+      console.log("Booking successful!");
+      alert("Appointment booked successfully!");
       onSuccess?.(); onClose();
     } catch (err) {
-      setError(err?.response?.data?.error || err?.response?.data?.detail || 'Booking failed. Try again.');
+      console.error("Booking failed:", err?.response?.data);
+      setError(err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail || 'Booking failed. Try again.');
     } finally { setLoading(false); }
   };
 
@@ -181,21 +191,35 @@ export default function BookingModal({ open, onClose, onSuccess, prefill = null 
                 <div className="grid grid-cols-4 gap-2">
                   {ALL_SLOTS.map(slot => {
                     const isBooked   = bookedSlots.includes(slot);
+                    
+                    // Disable past slots if booking for today
+                    let isPastSlot = false;
+                    if (form.date === todayStr()) {
+                      const now = new Date();
+                      const [h, m] = slot.split(':');
+                      const slotDate = new Date();
+                      slotDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+                      isPastSlot = slotDate < now;
+                    }
+                    
+                    const isDisabled = isBooked || isPastSlot;
                     const isSelected = form.time === slot;
+                    
                     return (
                       <button key={slot}
-                        disabled={isBooked}
+                        disabled={isDisabled}
                         onClick={() => setForm(f => ({ ...f, time: slot }))}
-                        className={`rounded-lg py-2 text-xs font-semibold transition ${
-                          isBooked
-                            ? 'cursor-not-allowed bg-red-500/10 text-red-400/50 line-through border border-red-500/20'
+                        className={`rounded-lg py-2 text-xs font-semibold transition flex flex-col items-center justify-center ${
+                          isDisabled
+                            ? 'cursor-not-allowed bg-red-500/5 text-red-400/30 border border-red-500/10'
                             : isSelected
-                            ? 'bg-cyan-500 text-white border border-cyan-400'
+                            ? 'bg-cyan-500 text-white border border-cyan-400 shadow-md'
                             : 'bg-slate-800 border border-white/10 text-slate-300 hover:border-cyan-500/50 hover:text-white'
                         }`}
                       >
-                        {slot}
-                        {isBooked && <span className="block text-[9px] font-normal mt-0.5">Booked</span>}
+                        <span className={isDisabled ? 'line-through' : ''}>{slot}</span>
+                        {isBooked && <span className="text-[9px] font-normal mt-0.5 text-red-400/50">Booked</span>}
+                        {isPastSlot && !isBooked && <span className="text-[9px] font-normal mt-0.5 text-slate-500">Passed</span>}
                       </button>
                     );
                   })}

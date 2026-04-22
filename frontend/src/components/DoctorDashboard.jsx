@@ -93,11 +93,17 @@ function VitalsChip({ appt }) {
 // ── Main Component ───────────────────────────────────────────────────────────────
 export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
+  const [allAppointments, setAllAppointments] = useState([]);
   const [stats, setStats] = useState({ total_patients: 0, completed: 0, pending: 0, cancelled: 0, earnings: 0 });
   const [queue, setQueue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(null);
+
+  // Tabs & History Filters
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'history'
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('ALL');
 
   // Prescription / Complete modal
   const [prescModal, setPrescModal] = useState(null); // { id, readOnly }
@@ -127,17 +133,25 @@ export default function DoctorDashboard() {
     navigate('/');
   };
 
-  const fetchData = () => {
-    setLoading(true);
-    API.get('dashboard/doctor/')
-      .then((res) => {
-        const d = res.data?.data ?? res.data;
-        setAppointments(d.appointments || []);
-        setStats(d.stats || {});
-        setQueue(d.queue || null);
-      })
-      .catch(() => setError('Failed to load doctor data.'))
-      .finally(() => setLoading(false));
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const [dashRes, apptsRes] = await Promise.all([
+        API.get('dashboard/doctor/'),
+        API.get('appointments/')
+      ]);
+      const d = dashRes.data?.data ?? dashRes.data;
+      setAppointments(d.appointments || []);
+      setStats(d.stats || {});
+      setQueue(d.queue || null);
+
+      const all = apptsRes.data?.data ?? apptsRes.data;
+      setAllAppointments(all || []);
+    } catch {
+      setError('Failed to load doctor data.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -177,7 +191,7 @@ export default function DoctorDashboard() {
         notes: doctorNotes,
       });
       setPrescModal(null);
-      fetchData();
+      fetchData(true);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to save prescription.');
     } finally {
@@ -190,7 +204,7 @@ export default function DoctorDashboard() {
     setUpdating(id);
     try {
       await API.patch(`appointments/${id}/wait-time/`, { change });
-      fetchData();
+      fetchData(true);
     } catch {
       alert('Failed to update wait time.');
     } finally {
@@ -280,45 +294,65 @@ export default function DoctorDashboard() {
       </nav>
 
       <main className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-black text-white">Doctor Dashboard</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Today's schedule and patient overview · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
-      </div>
-
-      {/* ── Smart Queue Banner ──────────────────────────────────────────────────── */}
-      <SmartQueueBanner queue={queue} />
-
-      {/* ── Quick Stats ──────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: 'Total Patients', value: stats.total_patients, icon: '👥', color: 'from-blue-600/20 to-blue-500/5 border-blue-500/20' },
-          { label: 'Completed', value: stats.completed, icon: '✅', color: 'from-emerald-600/20 to-emerald-500/5 border-emerald-500/20' },
-          { label: 'Pending', value: stats.pending, icon: '⏳', color: 'from-amber-600/20 to-amber-500/5 border-amber-500/20' },
-          { label: 'Earnings', value: `₹${Number(stats.earnings).toLocaleString()}`, icon: '💰', color: 'from-purple-600/20 to-purple-500/5 border-purple-500/20' },
-        ].map(({ label, value, icon, color }) => (
-          <div key={label} className={`bg-gradient-to-br ${color} border rounded-2xl p-5`}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-lg">{icon}</span>
-            </div>
-            <p className="text-2xl font-black text-white">{value}</p>
-            <p className="text-slate-400 text-xs mt-1">{label}</p>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-black text-white">Doctor Dashboard</h1>
+            <p className="text-slate-400 text-sm mt-1">
+              Today's schedule and patient overview · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
           </div>
-        ))}
-      </div>
-
-      {/* ── Today's Schedule ──────────────────────────────────────────────────────── */}
-      <div className="bg-slate-800/60 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-          <h2 className="font-bold text-white">Today's Appointments</h2>
-          <button onClick={fetchData}
-            className="text-xs font-medium text-slate-400 hover:text-cyan-400 transition-colors">
-            ↻ Refresh
-          </button>
+          
+          {/* Tabs */}
+          <div className="flex bg-slate-800/50 p-1 rounded-xl border border-white/5">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-cyan-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Today's Queue
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-cyan-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Appointment History
+            </button>
+          </div>
         </div>
 
-        {appointments.length > 0 ? (
+        {activeTab === 'dashboard' ? (
+          <>
+            {/* ── Smart Queue Banner ──────────────────────────────────────────────────── */}
+            <SmartQueueBanner queue={queue} />
+
+            {/* ── Quick Stats ──────────────────────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: 'Total Patients', value: stats.total_patients, icon: '👥', color: 'from-blue-600/20 to-blue-500/5 border-blue-500/20' },
+                { label: 'Completed', value: stats.completed, icon: '✅', color: 'from-emerald-600/20 to-emerald-500/5 border-emerald-500/20' },
+                { label: 'Pending', value: stats.pending, icon: '⏳', color: 'from-amber-600/20 to-amber-500/5 border-amber-500/20' },
+                { label: 'Earnings', value: `₹${Number(stats.earnings || 0).toLocaleString()}`, icon: '💰', color: 'from-purple-600/20 to-purple-500/5 border-purple-500/20' },
+              ].map(({ label, value, icon, color }) => (
+                <div key={label} className={`bg-gradient-to-br ${color} border rounded-2xl p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg">{icon}</span>
+                  </div>
+                  <p className="text-2xl font-black text-white">{value}</p>
+                  <p className="text-slate-400 text-xs mt-1">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Today's Schedule ──────────────────────────────────────────────────────── */}
+            <div className="bg-slate-800/60 border border-white/10 rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+                <h2 className="font-bold text-white">Today's Appointments</h2>
+                <button onClick={fetchData}
+                  className="text-xs font-medium text-slate-400 hover:text-cyan-400 transition-colors">
+                  ↻ Refresh
+                </button>
+              </div>
+
+              {appointments.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -386,7 +420,7 @@ export default function DoctorDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {(appt.status === 'BOOKED' || appt.status === 'ARRIVED') && (
+                        {['BOOKED', 'ARRIVED', 'IN_PROGRESS'].includes(appt.status) && (
                           <button
                             onClick={() => openPrescModal(appt)}
                             disabled={updating === appt.id}
@@ -418,6 +452,109 @@ export default function DoctorDashboard() {
           </div>
         )}
       </div>
+          </>
+        ) : (
+          <div className="bg-slate-800/60 border border-white/10 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-white/10 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <h2 className="font-bold text-white">Appointment History</h2>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search by name or contact..."
+                  value={historySearch}
+                  onChange={e => setHistorySearch(e.target.value)}
+                  className="px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
+                />
+                <select
+                  value={historyStatusFilter}
+                  onChange={e => setHistoryStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-cyan-500 [color-scheme:dark]"
+                >
+                  <option value="ALL" className="bg-slate-800">All Status</option>
+                  <option value="BOOKED" className="bg-slate-800">Upcoming / Booked</option>
+                  <option value="COMPLETED" className="bg-slate-800">Completed</option>
+                  <option value="CANCELLED" className="bg-slate-800">Cancelled</option>
+                </select>
+                <button onClick={fetchData} className="text-xs font-medium text-slate-400 hover:text-cyan-400 transition-colors whitespace-nowrap px-2">
+                  ↻ Refresh
+                </button>
+              </div>
+            </div>
+
+            {(() => {
+              const filtered = allAppointments.filter(a => {
+                const searchMatch = (a.patient_name || '').toLowerCase().includes(historySearch.toLowerCase()) ||
+                                    (a.contact || '').includes(historySearch);
+                const statusMatch = historyStatusFilter === 'ALL' || a.status === historyStatusFilter;
+                return searchMatch && statusMatch;
+              }).sort((a, b) => new Date(b.date + 'T' + b.time) - new Date(a.date + 'T' + a.time));
+
+              return filtered.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-slate-900/50">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Date & Time</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Patient</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Reason</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filtered.map(appt => (
+                        <tr key={appt.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-3">
+                            <p className="text-white font-semibold text-sm">{appt.date}</p>
+                            <p className="text-slate-400 text-xs">{appt.time}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <p className="text-white font-semibold text-sm">{appt.patient_name}</p>
+                              <button
+                                onClick={() => fetchPatientDetails(appt.patient_id)}
+                                className="hover:text-cyan-400 text-slate-400 transition-colors"
+                                title="View Patient Details"
+                              >
+                                👁
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                              {appt.contact && <span>📞 {appt.contact}</span>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {appt.reason ? <p className="text-xs text-slate-500 italic max-w-[150px] truncate">"{appt.reason}"</p> : <span className="text-slate-600">—</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[appt.status] || 'bg-slate-600 text-slate-300'}`}>
+                              {appt.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {appt.status === 'COMPLETED' && (
+                              <button
+                                onClick={() => openPrescModal(appt, true)}
+                                className="text-xs font-medium px-2 py-1 rounded-lg text-slate-400 hover:text-purple-300 transition-colors whitespace-nowrap border border-white/5 bg-white/5"
+                              >
+                                📋 View Rx
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="px-6 py-16 text-center">
+                  <p className="text-4xl mb-3">🔍</p>
+                  <p className="text-slate-400 text-sm">No appointments found matching filters.</p>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
       {/* ── Prescription / Complete Modal ────────────────────────────────────────── */}
       {prescModal && (

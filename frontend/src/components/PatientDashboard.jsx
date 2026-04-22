@@ -257,6 +257,7 @@ function ProfileModal({ open, onClose, profile, avatarSrc, onAvatarChange, fileI
 export default function PatientDashboard() {
   const [profile,      setProfile]      = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [labReports,   setLabReports]   = useState([]);
   const [avatarSrc,    setAvatarSrc]    = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
@@ -275,12 +276,14 @@ export default function PatientDashboard() {
     Promise.all([
       API.get('dashboard/patient/'),
       API.get('appointments/'),
+      API.get('patient/lab-reports/').catch(() => ({ data: { data: [] } })),
     ])
-      .then(([dashRes, apptRes]) => {
+      .then(([dashRes, apptRes, labRes]) => {
         const prof = dashRes.data.data?.profile || null;
         setProfile(prof);
         if (prof?.profile_image) setAvatarSrc(prof.profile_image);
         setAppointments(apptRes.data.data || []);
+        setLabReports(labRes.data.data || []);
       })
       .catch(() => setError('Failed to load dashboard. Please refresh.'))
       .finally(() => setLoading(false));
@@ -388,7 +391,7 @@ export default function PatientDashboard() {
       <PastAppointments appointments={appointments} />
 
       {/* ── SECTION 6: Medical Records ─────────────────────────────── */}
-      <MedicalRecords appointments={appointments} />
+      <MedicalRecords appointments={appointments} labReports={labReports} onReportsChanged={loadData} />
 
       {/* ── Booking Modal ──────────────────────────────────────────── */}
       <BookingModal

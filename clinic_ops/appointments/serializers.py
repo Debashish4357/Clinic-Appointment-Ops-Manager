@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Appointment
+from .models import Appointment, LabReport
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -31,3 +31,16 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return obj.patient.contact or ''
         except Exception:
             return ''
+
+class LabReportSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabReport
+        fields = ['id', 'patient', 'title', 'file', 'file_url', 'uploaded_at']
+        read_only_fields = ['patient', 'uploaded_at']
+
+    def get_file_url(self, obj):
+        if obj.file:
+            return obj.file.url
+        return None

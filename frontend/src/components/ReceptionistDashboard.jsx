@@ -45,12 +45,18 @@ export default function ReceptionistDashboard() {
   // Toast
   const [toast,         setToast]         = useState(null);
 
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [selectedDate, setSelectedDate]   = useState(todayStr());
+
   /* ── data loading ─────────────────────────────────────────── */
   const loadData = (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     
-    API.get('dashboard/receptionist/')
+    API.get(`dashboard/receptionist/?date=${selectedDate}`)
       .then(res => {
         const d = res.data?.data ?? res.data;
         setAppointments(d.appointments || []);
@@ -75,7 +81,7 @@ export default function ReceptionistDashboard() {
       });
   };
 
-  useEffect(() => { loadData(false); }, []);
+  useEffect(() => { loadData(false); }, [selectedDate]);
 
   /* ── toast helper ─────────────────────────────────────────── */
   const showToast = (msg, type = 'success') => {
@@ -112,6 +118,8 @@ export default function ReceptionistDashboard() {
           onBooking={() => setBookingOpen(true)}
           onWalkIn={() => setWalkInOpen(true)}
           loadingAppts={refreshing}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
         />
       );
       case 'appointments': return <AppointmentPage appointments={appointments} onRefresh={() => loadData(false)} />;

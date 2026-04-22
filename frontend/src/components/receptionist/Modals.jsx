@@ -46,7 +46,7 @@ export function BookingModal({ open, onClose, onSuccess }) {
       onSuccess?.();
       onClose();
     } catch (err) {
-      setError(err?.response?.data?.error || err?.response?.data?.detail || 'Booking failed.');
+      setError(err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail || 'Booking failed.');
     } finally { setLoading(false); }
   };
 

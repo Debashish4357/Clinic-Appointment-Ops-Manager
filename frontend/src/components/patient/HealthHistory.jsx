@@ -44,15 +44,80 @@ function PrescriptionsTab({ appointments }) {
 }
 
 /* ─── Lab Reports tab ────────────────────────────────────────── */
-function LabTab() {
+import API from '../../services/api';
+
+function LabTab({ labReports, onReportsChanged }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('title', file.name);
+
+    setUploading(true);
+    try {
+      await API.post('patient/lab-reports/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (onReportsChanged) onReportsChanged(true);
+    } catch (err) {
+      alert('Failed to upload lab report.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this report?')) return;
+    try {
+      await API.delete(`patient/lab-reports/${id}/`);
+      if (onReportsChanged) onReportsChanged(true);
+    } catch (err) {
+      alert('Failed to delete report.');
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center gap-3 py-12 text-center">
-      <span className="text-4xl">🧪</span>
-      <p className="text-slate-400 font-semibold">Lab Reports</p>
-      <p className="text-slate-500 text-sm">Your lab results will appear here once uploaded by your doctor</p>
-      <span className="mt-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-400">
-        Coming Soon
-      </span>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center bg-slate-800/50 p-4 rounded-xl border border-white/10">
+        <div>
+          <h3 className="text-sm font-bold text-white">Upload New Report</h3>
+          <p className="text-xs text-slate-400">PDFs or Images (max 5MB)</p>
+        </div>
+        <div>
+          <input type="file" id="lab-upload" className="hidden" accept=".pdf,image/*" onChange={handleUpload} disabled={uploading} />
+          <label htmlFor="lab-upload" className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold text-white transition-colors ${uploading ? 'bg-slate-600' : 'bg-cyan-600 hover:bg-cyan-500'}`}>
+            {uploading ? 'Uploading...' : 'Browse File'}
+          </label>
+        </div>
+      </div>
+
+      {labReports && labReports.length > 0 ? (
+        <div className="space-y-2">
+          {labReports.map(report => (
+            <div key={report.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5 hover:bg-white/10 transition">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{report.file_url?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}</span>
+                <div>
+                  <a href={report.file_url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-cyan-400 hover:underline">{report.title}</a>
+                  <p className="text-xs text-slate-500">{new Date(report.uploaded_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+              <button onClick={() => handleDelete(report.id)} className="text-slate-500 hover:text-red-400 p-2 transition">✕</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 py-12 text-center">
+          <span className="text-4xl">🧪</span>
+          <p className="text-slate-400 font-semibold">Lab Reports</p>
+          <p className="text-slate-500 text-sm">Your lab results will appear here once uploaded by your doctor, or you can upload them yourself!</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -92,7 +157,7 @@ function HistoryTab({ appointments }) {
 }
 
 /* ─── Main component ─────────────────────────────────────────── */
-export default function HealthHistory({ appointments }) {
+export default function HealthHistory({ appointments, labReports, onReportsChanged }) {
   const [tab, setTab] = useState('prescriptions');
 
   // Past = completed / cancelled / no_show
@@ -123,7 +188,7 @@ export default function HealthHistory({ appointments }) {
         {/* Content */}
         <div className="p-4">
           {tab === 'prescriptions' && <PrescriptionsTab appointments={past} />}
-          {tab === 'lab'           && <LabTab />}
+          {tab === 'lab'           && <LabTab labReports={labReports} onReportsChanged={onReportsChanged} />}
           {tab === 'history'       && <HistoryTab appointments={appointments} />}
         </div>
       </div>
