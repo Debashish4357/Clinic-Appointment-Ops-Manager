@@ -5,6 +5,7 @@ from .models import Appointment
 class AppointmentSerializer(serializers.ModelSerializer):
     doctor_name  = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
+    contact      = serializers.SerializerMethodField()  # Fix 5: QueuePage searches by contact
 
     class Meta:
         model = Appointment
@@ -24,3 +25,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return u.get_full_name() or u.username
         except Exception:
             return None
+
+    def get_contact(self, obj):
+        try:
+            return obj.patient.contact or ''
+        except Exception:
+            return ''

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 
 const STATUS_STYLES = {
@@ -108,6 +109,24 @@ export default function DoctorDashboard() {
   const [patientModal, setPatientModal] = useState(null);
   const [fetchingPatient, setFetchingPatient] = useState(false);
 
+  // Profile dropdown state
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+  const navigate = useNavigate();
+
+  // Handle clicking outside profile dropdown
+  useEffect(() => {
+    const handler = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    navigate('/');
+  };
+
   const fetchData = () => {
     setLoading(true);
     API.get('dashboard/doctor/')
@@ -211,9 +230,58 @@ export default function DoctorDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white">Doctor Dashboard</h1>
+    <div className="min-h-screen bg-[#0f172a] text-slate-300 font-sans selection:bg-cyan-500/30 pb-12">
+      {/* ── Navbar ────────────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20">
+              <span className="font-black text-sm">C</span>
+            </div>
+            <span className="text-lg font-black tracking-tight text-white hidden sm:block">ClinicPortal</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen(o => !o)}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 hover:bg-white/10 transition"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-black">
+                  D
+                </div>
+                <div className="hidden sm:block text-left">
+                  <p className="text-xs font-bold text-white leading-tight">Doctor</p>
+                  <p className="text-[10px] text-cyan-400">Clinic Staff</p>
+                </div>
+                <svg className={`h-3.5 w-3.5 text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-white/10 bg-slate-900 shadow-2xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Log Out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-black text-white">Doctor Dashboard</h1>
         <p className="text-slate-400 text-sm mt-1">
           Today's schedule and patient overview · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
@@ -547,6 +615,7 @@ export default function DoctorDashboard() {
           </div>
         </div>
       )}
+      </main>
     </div>
   );
 }

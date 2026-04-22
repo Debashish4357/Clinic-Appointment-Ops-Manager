@@ -33,6 +33,18 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
+class UserProfileView(APIView):
+    """GET /api/profile/ — returns the role and basic info of the logged-in user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            'id': request.user.id,
+            'username': request.user.username,
+            'role': request.user.role,
+        }, status=status.HTTP_200_OK)
+
+
 # ── Patient Signup (public — PATIENT role only) ────────────────────────────────
 
 class RegisterView(APIView):

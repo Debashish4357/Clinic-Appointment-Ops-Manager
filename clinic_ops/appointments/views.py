@@ -48,28 +48,36 @@ class AppointmentView(APIView):
 
     # ── POST /api/appointments/ ────────────────────────────────────────────────
     def post(self, request):
-        # Only PATIENT role can book appointments
-        if request.user.role != 'PATIENT':
-            return Response(
-                {'message': 'Only patients can book appointments.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        role = request.user.role
 
-        # Resolve patient from the logged-in user
-        try:
-            patient = Patient.objects.get(user=request.user)
-        except Patient.DoesNotExist:
-            return Response(
-                {'message': 'Patient profile not found for this user.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Check if patient profile is completed
-        if not patient.profile_completed:
-            return Response(
-                {'message': 'Please complete your profile before booking.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Fix 1: PATIENT books for themselves; RECEPTIONIST/ADMIN can book for any patient
+        if role == 'PATIENT':
+            try:
+                patient = Patient.objects.get(user=request.user)
+            except Patient.DoesNotExist:
+                return Response(
+                    {'message': 'Patient profile not found for this user.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            # Check if patient profile is completed
+            if not patient.profile_completed:
+                return Response(
+                    {'message': 'Please complete your profile before booking.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif role in ['RECEPTIONIST', 'ADMIN']:
+            patient_id = request.data.get('patient_id')
+            if not patient_id:
+                return Response(
+                    {'message': 'patient_id is required for receptionist/admin booking.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                patient = Patient.objects.get(id=patient_id)
+            except Patient.DoesNotExist:
+                return Response({'message': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({'message': 'Unauthorized role.'}, status=status.HTTP_403_FORBIDDEN)
 
         doctor_id        = request.data.get('doctor')
         appt_date        = request.data.get('date')
@@ -200,7 +208,7 @@ class AppointmentDetailView(APIView):
             if 'advice' in request.data:
                 appointment.advice = request.data['advice']
 
-        # ── RECEPTIONIST: Check-In / Check-Out / Cancel ─────────────────────────
+        # ── RECEPTIONIST: Full lifecycle transitions ────────────────────────────
         elif role == 'RECEPTIONIST':
             if not new_status:
                 return Response(
@@ -217,28 +225,37 @@ class AppointmentDetailView(APIView):
                     )
                 appointment.status = 'ARRIVED'
 
-            # ARRIVED → COMPLETED (Check-Out)
-            elif new_status == 'COMPLETED':
+            # Fix 2: ARRIVED → IN_PROGRESS (Start Consultation)
+            elif new_status == 'IN_PROGRESS':
                 if appointment.status != 'ARRIVED':
                     return Response(
-                        {'message': 'Can only check-out an ARRIVED appointment.'},
+                        {'message': 'Can only start consultation for an ARRIVED appointment.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                appointment.status = 'IN_PROGRESS'
+
+            # IN_PROGRESS → COMPLETED
+            elif new_status == 'COMPLETED':
+                if appointment.status not in ['ARRIVED', 'IN_PROGRESS']:
+                    return Response(
+                        {'message': 'Can only complete an ARRIVED or IN_PROGRESS appointment.'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 appointment.status = 'COMPLETED'
 
-            # BOOKED → CANCELLED
+            # BOOKED / ARRIVED → CANCELLED
             elif new_status == 'CANCELLED':
-                if appointment.status != 'BOOKED':
+                if appointment.status not in ['BOOKED', 'ARRIVED']:
                     return Response(
-                        {'message': 'Can only cancel a BOOKED appointment.'},
+                        {'message': 'Can only cancel a BOOKED or ARRIVED appointment.'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 appointment.status = 'CANCELLED'
 
             else:
                 return Response(
-                    {'message': 'Receptionist can set status to ARRIVED, COMPLETED, or CANCELLED.'},
-                    status=status.HTTP_403_FORBIDDEN
+                    {'message': 'Invalid status transition.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
         # ── ADMIN: Any valid transition ────────────────────────────────────────
@@ -544,9 +561,14 @@ class AdminDashboardView(APIView):
         if request.user.role != 'ADMIN':
             return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
+        today = date.today()
+
         total_revenue = Appointment.objects.filter(
             status=Appointment.Status.COMPLETED
         ).aggregate(total=Sum('fee'))['total'] or 0.00
+
+        # Fix 4: Add today's breakdown
+        today_qs = Appointment.objects.filter(date=today)
 
         data = {
             'total_users': User.objects.count(),
@@ -554,6 +576,13 @@ class AdminDashboardView(APIView):
             'total_patients': Patient.objects.count(),
             'total_appointments': Appointment.objects.count(),
             'total_revenue': total_revenue,
+            'today': {
+                'total':     today_qs.count(),
+                'completed': today_qs.filter(status='COMPLETED').count(),
+                'pending':   today_qs.filter(status='BOOKED').count(),
+                'arrived':   today_qs.filter(status='ARRIVED').count(),
+                'cancelled': today_qs.filter(status='CANCELLED').count(),
+            },
         }
         return Response({'message': 'Success', 'data': data})
 
@@ -640,7 +669,8 @@ class ReceptionistDashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.role != 'RECEPTIONIST':
+        # Fix 3: Allow both RECEPTIONIST and ADMIN to view this dashboard
+        if request.user.role not in ['RECEPTIONIST', 'ADMIN']:
             return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         today = date.today()
@@ -715,6 +745,7 @@ class PatientDashboardView(APIView):
 
         data = {
             'profile': {
+                'name':               request.user.get_full_name() or request.user.username,
                 'username':           request.user.username,
                 'age':                patient.age,
                 'contact':            patient.contact,

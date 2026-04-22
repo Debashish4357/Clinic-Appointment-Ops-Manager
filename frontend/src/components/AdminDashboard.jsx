@@ -177,6 +177,27 @@ export default function AdminDashboard() {
         />
       </div>
 
+      {/* Today's Breakdown */}
+      {data?.today && (
+        <div className="bg-slate-800/60 border border-white/10 rounded-2xl p-6">
+          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Today's Appointments</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            {[
+              { label: 'Total',     value: data.today.total,     color: 'text-white' },
+              { label: 'Pending',   value: data.today.pending,   color: 'text-blue-400' },
+              { label: 'Arrived',   value: data.today.arrived,   color: 'text-amber-400' },
+              { label: 'Completed', value: data.today.completed, color: 'text-emerald-400' },
+              { label: 'Cancelled', value: data.today.cancelled, color: 'text-red-400' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="text-center bg-slate-900/50 rounded-xl py-4 border border-white/5">
+                <p className={`text-2xl font-black ${color}`}>{value ?? 0}</p>
+                <p className="text-slate-500 text-xs font-semibold mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Create Receptionist Panel */}
       <div className="max-w-md">
         <CreateReceptionistForm />
