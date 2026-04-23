@@ -26,7 +26,7 @@ A comprehensive Clinic Management System designed to streamline patient workflow
 ## 🛠️ Tech Stack
 
 - **Backend:** Django, Django REST Framework, SQLite (Local) / PostgreSQL (Production)
-- **Frontend:** React, Tailwind CSS, Vite
+- **Frontend:** React(Vite), Tailwind CSS
 - **Auth:** JWT (JSON Web Tokens)
 - **Deployment:** Render (Backend), Vercel/Netlify (Frontend)
 
