@@ -432,10 +432,10 @@ export default function DoctorDashboard() {
                         )}
                         {appt.status === 'COMPLETED' && (
                           <button
-                            onClick={() => openPrescModal(appt, true)}
+                            onClick={() => openPrescModal(appt, false)}
                             className="text-xs font-medium px-2 py-1 rounded-lg text-slate-400 hover:text-purple-300 transition-colors whitespace-nowrap"
                           >
-                            📋 View Rx
+                            📋 Edit Rx
                           </button>
                         )}
                       </div>

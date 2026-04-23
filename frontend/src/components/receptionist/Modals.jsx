@@ -121,7 +121,10 @@ export function WalkInModal({ open, onClose, onSuccess }) {
   const [fetching, setFetching] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
-  const [form,     setForm]     = useState({ name: '', doctor: '', time: '' });
+  const [form,     setForm]     = useState({ 
+    name: '', contact: '', age: '', gender: '', reason: '', doctor: '', time: '',
+    address: '', medical_history: '', allergies: '', current_medication: '', insurance_info: ''
+  });
 
   useEffect(() => {
     if (!open || doctors.length) return;
@@ -130,7 +133,13 @@ export function WalkInModal({ open, onClose, onSuccess }) {
   }, [open]);
 
   useEffect(() => {
-    if (open) { setForm({ name: '', doctor: '', time: '' }); setError(''); }
+    if (open) { 
+      setForm({ 
+        name: '', contact: '', age: '', gender: '', reason: '', doctor: '', time: '',
+        address: '', medical_history: '', allergies: '', current_medication: '', insurance_info: ''
+      }); 
+      setError(''); 
+    }
   }, [open]);
 
   if (!open) return null;
@@ -147,6 +156,15 @@ export function WalkInModal({ open, onClose, onSuccess }) {
         date:    today,
         time,
         walk_in_name: form.name,
+        contact: form.contact,
+        age: form.age || null,
+        gender: form.gender || 'OTHER',
+        reason: form.reason,
+        address: form.address,
+        medical_history: form.medical_history,
+        allergies: form.allergies,
+        current_medication: form.current_medication,
+        insurance_info: form.insurance_info,
         is_walk_in: true,
       });
       onSuccess?.();
@@ -158,7 +176,7 @@ export function WalkInModal({ open, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-lg max-h-[95vh] overflow-y-auto rounded-2xl border border-white/10 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div>
             <h2 className="font-black text-white text-lg">Add Walk-in</h2>
@@ -170,10 +188,70 @@ export function WalkInModal({ open, onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">{error}</div>}
 
-          <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Patient Name *</label>
-            <input type="text" value={form.name} placeholder="Full name"
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inputCls} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Patient Name *</label>
+              <input type="text" value={form.name} placeholder="Full name"
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inputCls} />
+            </div>
+
+            <div className="col-span-1">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Contact</label>
+              <input type="text" value={form.contact} placeholder="Phone number"
+                onChange={e => setForm(f => ({ ...f, contact: e.target.value }))} className={inputCls} />
+            </div>
+
+            <div className="col-span-1 flex gap-2">
+              <div className="flex-1">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Age</label>
+                <input type="number" value={form.age} placeholder="Age"
+                  onChange={e => setForm(f => ({ ...f, age: e.target.value }))} className={inputCls} />
+              </div>
+              <div className="flex-1">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Gender</label>
+                <select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} className={inputCls}>
+                  <option value="">--</option>
+                  <option value="M">M</option>
+                  <option value="F">F</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Reason</label>
+              <input type="text" value={form.reason} placeholder="e.g. Fever, Cough"
+                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} className={inputCls} />
+            </div>
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Address</label>
+              <textarea value={form.address} rows="2" placeholder="Patient Address"
+                onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className={inputCls} />
+            </div>
+
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Medical History</label>
+              <textarea value={form.medical_history} rows="2" placeholder="Past illnesses, surgeries..."
+                onChange={e => setForm(f => ({ ...f, medical_history: e.target.value }))} className={inputCls} />
+            </div>
+
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Allergies</label>
+              <input type="text" value={form.allergies} placeholder="Known allergies"
+                onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))} className={inputCls} />
+            </div>
+
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Current Medications</label>
+              <textarea value={form.current_medication} rows="2" placeholder="Active prescriptions"
+                onChange={e => setForm(f => ({ ...f, current_medication: e.target.value }))} className={inputCls} />
+            </div>
+
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Insurance Info</label>
+              <input type="text" value={form.insurance_info} placeholder="Provider, policy number..."
+                onChange={e => setForm(f => ({ ...f, insurance_info: e.target.value }))} className={inputCls} />
+            </div>
           </div>
 
           <div>
@@ -191,7 +269,7 @@ export function WalkInModal({ open, onClose, onSuccess }) {
             <input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className={inputCls} />
           </div>
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3 pt-4 border-t border-white/5">
             <button type="button" onClick={onClose}
               className="flex-1 rounded-xl border border-white/10 bg-slate-800 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700">
               Cancel

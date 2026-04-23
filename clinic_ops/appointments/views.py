@@ -75,9 +75,29 @@ class AppointmentView(APIView):
             if request.data.get('is_walk_in'):
                 import uuid
                 walk_in_name = request.data.get('walk_in_name', 'Walk-in Patient')
+                walk_in_contact = request.data.get('contact', '')
+                walk_in_age = request.data.get('age', None)
+                walk_in_gender = request.data.get('gender', 'OTHER')
+                walk_in_address = request.data.get('address', '')
+                walk_in_medical_history = request.data.get('medical_history', '')
+                walk_in_allergies = request.data.get('allergies', '')
+                walk_in_current_medication = request.data.get('current_medication', '')
+                walk_in_insurance_info = request.data.get('insurance_info', '')
+
                 dummy_username = f"walkin_{uuid.uuid4().hex[:8]}"
                 user = User.objects.create(username=dummy_username, first_name=walk_in_name, role='PATIENT')
-                patient = Patient.objects.create(user=user, profile_completed=True)
+                patient = Patient.objects.create(
+                    user=user, 
+                    profile_completed=True,
+                    contact=walk_in_contact,
+                    age=walk_in_age,
+                    gender=walk_in_gender,
+                    address=walk_in_address,
+                    medical_history=walk_in_medical_history,
+                    allergies=walk_in_allergies,
+                    current_medication=walk_in_current_medication,
+                    insurance_info=walk_in_insurance_info
+                )
             else:
                 patient_id = request.data.get('patient_id') or request.data.get('patient')
                 if not patient_id:
@@ -211,7 +231,7 @@ class AppointmentDetailView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
             if new_status == 'COMPLETED':
-                if appointment.status not in ['BOOKED', 'ARRIVED']:
+                if appointment.status not in ['BOOKED', 'ARRIVED', 'IN_PROGRESS']:
                     return Response(
                         {'message': f'Cannot complete an appointment with status {appointment.status}.'},
                         status=status.HTTP_400_BAD_REQUEST
@@ -394,10 +414,19 @@ class AppointmentMoveView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST)
             swap_target = nxt
 
-        # Swap token numbers
-        current.token_number, swap_target.token_number = swap_target.token_number, current.token_number
+        # Swap token numbers safely to avoid unique constraint violation
+        temp_token = 999999
+        current_token = current.token_number
+        target_token = swap_target.token_number
+
+        current.token_number = temp_token
         current.save(update_fields=['token_number'])
+
+        swap_target.token_number = current_token
         swap_target.save(update_fields=['token_number'])
+
+        current.token_number = target_token
+        current.save(update_fields=['token_number'])
 
         return Response({
             'message': f'Appointment moved {action.lower()} successfully.',
@@ -486,7 +515,7 @@ class AppointmentCompleteView(APIView):
         except Appointment.DoesNotExist:
             return Response({'message': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if appt.status not in ['BOOKED', 'ARRIVED']:
+        if appt.status not in ['BOOKED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED']:
             return Response({'message': f'Cannot complete an appointment with status {appt.status}.'}, status=status.HTTP_400_BAD_REQUEST)
 
         appt.status = 'COMPLETED'
