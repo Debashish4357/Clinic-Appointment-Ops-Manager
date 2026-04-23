@@ -220,6 +220,7 @@ class PatientDetailView(APIView):
             'allergies': patient.allergies,
             'current_medication': patient.current_medication,
             'insurance_info': patient.insurance_info,
+            'address': patient.address,
             'lab_reports': reports_data,
             'recent_appointments': recent_list,
         }
@@ -350,9 +351,30 @@ class DoctorListView(APIView):
         data = [{
             'id': d.id,
             'name': f"Dr. {d.user.get_full_name() or d.user.username}",
-            'specialization': d.specialization
+            'specialization': d.specialization,
+            'consultation_fee': str(d.consultation_fee),
+            'avg_consultation_time': d.avg_consultation_time,
+            'is_available': d.is_available
         } for d in doctors]
         return Response(data, status=status.HTTP_200_OK)
+
+class DoctorDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role not in ['ADMIN', 'RECEPTIONIST']:
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            doctor = Doctor.objects.get(pk=pk)
+        except Doctor.DoesNotExist:
+            return Response({'message': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if 'is_available' in request.data:
+            doctor.is_available = request.data['is_available']
+        
+        doctor.save()
+        return Response({'message': 'Doctor updated successfully.'}, status=status.HTTP_200_OK)
 
 class PatientListView(APIView):
     permission_classes = [IsAuthenticated]

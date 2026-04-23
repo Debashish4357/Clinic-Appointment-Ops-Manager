@@ -25,6 +25,7 @@ class Doctor(models.Model):
     specialization = models.CharField(max_length=100, blank=True)
     consultation_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
     avg_consultation_time = models.PositiveIntegerField(default=15, help_text='Average consultation time in minutes')
+    is_available = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Dr. {self.user.get_full_name() or self.user.username}"
