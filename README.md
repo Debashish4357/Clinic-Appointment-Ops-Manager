@@ -1,117 +1,96 @@
 # Clinic Appointment Ops Manager 🏥
 
-A robust, full-stack clinic management system designed for seamless patient flow, role-based dashboards, and real-time queue management.
+A comprehensive Clinic Management System designed to streamline patient workflows, doctor consultations, and administrative tasks. Built with **Django REST Framework** and **React**.
 
----
----
+## 🌟 Key Features
 
-## 🚀 Overview
+### 👨‍⚕️ Doctor Dashboard
+- **Queue Management:** Real-time view of today's patients.
+- **Digital Prescriptions (Rx):** Create and edit prescriptions with medication, dosage, and frequency.
+- **Patient History:** Quick access to medical history, allergies, and past visit summaries.
+- **Availability Toggle:** Set "Active" or "Inactive" status directly from the dashboard.
 
-**Clinic Appointment Ops Manager** is a complete solution for clinics to manage appointments, patient records, and doctor schedules. It features a sophisticated token-based queue system, smart wait-time estimation, and dedicated dashboards for Admin, Doctors, Receptionists, and Patients.
+### 📋 Receptionist Dashboard
+- **Walk-in Registration:** Register new patients instantly with comprehensive medical profiles (Address, Insurance, History).
+- **Appointment Booking:** Manage slots for different doctors.
+- **Smart Queue:** Reorder appointments and adjust estimated wait times.
+- **Doctor Directory:** Manage doctor accounts and their consulting fees.
 
----
-
-Deploy Link-
-https://clinic-frontend-49mz.onrender.com
-
-
-## ✨ Key Features
-
-### 🔐 Secure Authentication
-- **JWT-Based Auth**: Secure login and signup using SimpleJWT.
-- **Role-Based Access Control (RBAC)**: Specific views and permissions for **Admin, Doctor, Receptionist, and Patient**.
-
-### 👥 Role-Specific Dashboards
-- **👨‍⚕️ Doctor Dashboard**: View today's schedule, mark patients as arrived/completed, and manage prescriptions/medical notes in real-time.
-- **🏢 Receptionist Dashboard**: Manage the "Token Queue," perform patient check-ins (ARRIVED) and check-outs, and reorder the queue with simple Up/Down controls.
-- **👤 Patient Portal**: Complete one-time medical profiles, book appointments (New or Follow-up), and track live token status and estimated wait times.
-- **⚙️ Admin Panel**: Oversight of all users, doctor performance, and clinic revenue analytics.
-
-### 📅 Smart Appointment System
-- **Token-Based Queue**: Automated token generation per doctor, per day.
-- **Wait Time Estimation**: Dynamically calculates wait times based on the queue status.
-- **Queue Management**: Specialized flow: `BOOKED` → `ARRIVED` (Check-in) → `COMPLETED` (Check-out).
+### 👤 Patient Portal
+- **Profile Management:** Update personal and medical information.
+- **Booking:** Select doctors and time slots.
+- **Visit History:** View past prescriptions and doctor feedback.
 
 ---
 
-## 🛠 Tech Stack
+## 🛠️ Tech Stack
 
-### Backend
-- **Framework**: Django & Django REST Framework (DRF)
-- **Database**: PostgreSQL  , SQL lite
-- **Auth**: SimpleJWT (JSON Web Tokens)
-- **Logic**: Custom ORM queries for queue management and analytics.
-
-### Frontend
-- **Library**: React (Vite)
-- **Styling**: Tailwind CSS
-- **API Client**: Axios (with custom interceptors for JWT handling)
-- **Routing**: React Router DOM
+- **Backend:** Django, Django REST Framework, SQLite (Local) / PostgreSQL (Production)
+- **Frontend:** React, Tailwind CSS, Vite
+- **Auth:** JWT (JSON Web Tokens)
+- **Deployment:** Render (Backend), Vercel/Netlify (Frontend)
 
 ---
 
-## 📂 Project Structure
+## 🚀 Local Setup
 
-```text
-Clinic appointment/
-├── clinic_ops/             # Django Backend
-│   ├── appointments/       # Appointment logic, models, and views
-│   ├── users/              # Custom User & Profile models
-│   └── clinic_ops/         # Main settings & URL config
-├── frontend/               # React Frontend (Vite)
-│   ├── src/
-│   │   ├── components/     # Reusable UI & Dashboards
-│   │   ├── pages/          # Login, Signup, Appointments
-│   │   └── services/       # API & Auth service logic (Axios)
-└── README.md
-```
+### Backend (clinic_ops)
+1. **Navigate to backend:**
+   ```bash
+   cd clinic_ops
+   ```
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Run migrations:**
+   ```bash
+   python manage.py migrate
+   ```
+4. **Start server:**
+   ```bash
+   python manage.py runserver
+   ```
+
+### Frontend (frontend)
+1. **Navigate to frontend:**
+   ```bash
+   cd frontend
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Start development server:**
+   ```bash
+   npm run dev
+   ```
 
 ---
 
-## ⚙️ Installation & Setup
+## ☁️ Deployment (Render)
 
-### 1. Prerequisites
-- Python 3.x
-- Node.js & npm
-- PostgreSQL
+### Environment Variables
+Set these variables in your Render Web Service:
+- `DATABASE_URL`: Your PostgreSQL Connection String (Use **External URL** for build stability).
+- `SECRET_KEY`: A unique random string.
+- `DEBUG`: `False`
+- `CORS_ALLOWED_ORIGINS`: Your frontend URL.
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`: For automatic admin creation.
 
-### 2. Backend Setup
+### Start Command
 ```bash
-# Navigate to backend
-cd clinic_ops
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure Database in clinic_ops/settings.py (Postgres)
-
-# Run Migrations
-python manage.py makemigrations
-python manage.py migrate
-
-# Start Server
-python manage.py runserver
-```
-
-### 3. Frontend Setup
-```bash
-# Navigate to frontend
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start Dev Server
-npm run dev
+python manage.py migrate && python manage.py create_admin && gunicorn clinic_ops.wsgi
 ```
 
 ---
 
-## 📸 API Reference Highlights
-- `POST /api/token/`: Get Access & Refresh tokens.
-- `GET /api/dashboard/doctor/`: Doctor status and today's queue.
-- `PATCH /api/appointments/{id}/move/`: Receptionist reorders the queue.
-- `POST /api/patient/profile/`: One-time patient medical history setup.
+## 🔑 Admin Credentials
+To create your first admin account without using a shell:
+1. Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in your Environment Variables.
+2. The `create_admin` command in the Start Command will automatically create the account if it doesn't exist.
 
 ---
 
+## 📄 License
+This project is for clinical operational management and private clinic use.
