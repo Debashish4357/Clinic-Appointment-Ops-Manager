@@ -149,12 +149,12 @@ REST_FRAMEWORK = {
     ),
 }
 
-# CORS — allow all during development; override in production via env
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-else:
+# CORS — allow all during development or if explicitly allowed
+CORS_ALLOW_ALL_ORIGINS = DEBUG or os.getenv('CORS_ALLOW_ALL', 'False') == 'True'
+
+if not CORS_ALLOW_ALL_ORIGINS:
     CORS_ALLOWED_ORIGINS = [
-        os.getenv('FRONTEND_URL', 'https://your-frontend-url.onrender.com'),
+        os.getenv('FRONTEND_URL', 'https://clinic-frontend-49mz.onrender.com'),
     ]
 
 CORS_ALLOW_CREDENTIALS = True

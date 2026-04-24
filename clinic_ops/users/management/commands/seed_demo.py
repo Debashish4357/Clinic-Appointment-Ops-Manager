@@ -17,7 +17,7 @@ class Command(BaseCommand):
         Appointment.objects.all().delete()
         Doctor.objects.all().delete()
         Patient.objects.all().delete()
-        User.objects.exclude(is_superuser=True).delete()
+        User.objects.exclude(is_superuser=True).exclude(role='ADMIN').delete()
         self.stdout.write(self.style.WARNING("Cleared existing non-admin data."))
 
         # 1. CREATE ROLES & MAIN ADMIN
