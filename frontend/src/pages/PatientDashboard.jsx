@@ -108,8 +108,8 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               ['Age', 'age', 'number', '28'],
-              ['Contact', 'contact', 'text', '+91 9876543210'],
-              ['Emergency Contact', 'emergency_contact', 'text', '+91 9876543211'],
+              ['Contact', 'contact', 'text', '9876543210'],
+              ['Emergency Contact', 'emergency_contact', 'text', '9876543211'],
               ['Blood Group', 'blood_group', 'select', ['A+','A-','B+','B-','O+','O-','AB+','AB-']],
               ['Gender', 'gender', 'select', [['MALE','Male'],['FEMALE','Female'],['OTHER','Other']]],
             ].map(([label, key, type, options]) => (
@@ -298,9 +298,12 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     loadData(false);
+    // NEW: Stop polling if a modal is open so the user doesn't lose their typed data
+    if (bookingOpen || editProfileOpen) return;
+
     const id = setInterval(() => loadData(true), 20000);
     return () => clearInterval(id);
-  }, []);
+  }, [bookingOpen, editProfileOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
