@@ -46,8 +46,13 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
     try {
       const fd = new FormData();
       Object.keys(form).forEach(k => {
-        if (form[k] !== null && form[k] !== undefined) {
-          fd.append(k, form[k]);
+        let val = form[k];
+        // Clean phone numbers on frontend too for immediate UX
+        if ((k === 'contact' || k === 'emergency_contact') && val) {
+          val = String(val).replace(/\D/g, ''); // keep only digits
+        }
+        if (val !== null && val !== undefined) {
+          fd.append(k, val);
         }
       });
       if (imageFile) {
@@ -57,10 +62,16 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
       await API.patch('patient/profile/', fd, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+      
+      // If we are forcing them to complete profile, show a nice message
+      if (profile.profile_completed === false) {
+        alert("Profile completed! You can now book appointments.");
+      }
+
       onSaved?.();
       onClose();
     } catch (e) {
-      setErr(e?.response?.data?.message || 'Save failed. Try again.');
+      setErr(e?.response?.data?.message || 'Save failed. Please check your inputs (Age and 10-digit Contact are required).');
     } finally { setSaving(false); }
   };
 
@@ -269,10 +280,15 @@ export default function PatientDashboard() {
     try {
       const res  = await API.get('dashboard/patient/');
       const data = res.data?.data || res.data;
-      setProfile(data.profile || {});
-      // Merge patients_appointments (all) if available
+      const prof = data.profile || {};
+      setProfile(prof);
       setAppointments(data.patients_appointments || data.appointments || []);
       setLabReports(data.lab_reports || []);
+
+      // NEW: Force open profile if not completed
+      if (prof.profile_completed === false) {
+        setEditProfileOpen(true);
+      }
     } catch {
       setError('Failed to load dashboard data. Please refresh.');
     } finally {
@@ -282,7 +298,6 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     loadData(false);
-    // Poll every 20s (gentle — patient dashboard doesn't need real-time as much)
     const id = setInterval(() => loadData(true), 20000);
     return () => clearInterval(id);
   }, []);

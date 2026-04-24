@@ -278,50 +278,66 @@ class PatientProfileView(APIView):
         """Shared save logic for POST and PATCH."""
         data = request.data
 
-        # ── Contact validation ───────────────────────────────────────────────
-        contact = data.get('contact', None)
-        if contact is not None:
-            contact_digits = str(contact).strip()
-            if contact_digits and (not contact_digits.isdigit() or len(contact_digits) != 10):
-                return Response(
-                    {'message': 'Contact number must be exactly 10 digits.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            patient.contact = contact_digits
+        # Helper to clean strings and handle empty/null
+        def get_clean(key):
+            val = data.get(key)
+            if val is None: return None
+            return str(val).strip()
 
-        # ── Scalar fields (only update if present in request) ────────────────
-        if data.get('age') is not None:
-            patient.age = data['age']
-        if data.get('gender') is not None:
-            patient.gender = data['gender']
-        if data.get('emergency_contact') is not None:
-            ec = str(data['emergency_contact']).strip()
-            if ec and (not ec.isdigit() or len(ec) != 10):
-                return Response(
-                    {'message': 'Emergency contact must be exactly 10 digits.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            patient.emergency_contact = ec
-        if data.get('blood_group') is not None:
-            patient.blood_group = data['blood_group']
-        if data.get('medical_history') is not None:
-            patient.medical_history = data['medical_history']
-        if data.get('allergies') is not None:
-            patient.allergies = data['allergies']
-        if data.get('current_medication') is not None:
-            patient.current_medication = data['current_medication']
-        if data.get('insurance_info') is not None:
-            patient.insurance_info = data['insurance_info']
-        if data.get('address') is not None:
-            patient.address = data['address']
+        # ── Age (Integer) ───────────────────────────────────────────────────
+        age_val = get_clean('age')
+        if age_val is not None:
+            if age_val == "":
+                patient.age = None
+            else:
+                try:
+                    patient.age = int(age_val)
+                except ValueError:
+                    return Response({'message': 'Age must be a valid number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── Contact numbers (Clean and validate) ──────────────────────────
+        def clean_phone(key, label):
+            val = get_clean(key)
+            if val is None: return None
+            # Remove all non-digits (like +, spaces, dashes)
+            digits = "".join(filter(str.isdigit, val))
+            # If it's 12 digits and starts with 91, take last 10
+            if len(digits) == 12 and digits.startswith('91'):
+                digits = digits[2:]
+            
+            if digits and len(digits) != 10:
+                return f"{label} must be exactly 10 digits."
+            return digits
+
+        contact = clean_phone('contact', 'Contact number')
+        if isinstance(contact, str) and "must be" in contact:
+            return Response({'message': contact}, status=status.HTTP_400_BAD_REQUEST)
+        if contact is not None:
+            patient.contact = contact
+
+        emergency = clean_phone('emergency_contact', 'Emergency contact')
+        if isinstance(emergency, str) and "must be" in emergency:
+            return Response({'message': emergency}, status=status.HTTP_400_BAD_REQUEST)
+        if emergency is not None:
+            patient.emergency_contact = emergency
+
+        # ── Other fields ────────────────────────────────────────────────────
+        for field in ['gender', 'blood_group', 'medical_history', 'allergies', 
+                      'current_medication', 'insurance_info', 'address']:
+            val = get_clean(field)
+            if val is not None:
+                setattr(patient, field, val)
 
         # ── Profile image ────────────────────────────────────────────────────
         if 'profile_image' in request.FILES:
             patient.profile_image = request.FILES['profile_image']
 
         # Mark profile completed if core fields are present
+        # Core fields: Age, Contact, Gender
         if patient.age and patient.contact and patient.gender:
             patient.profile_completed = True
+        else:
+            patient.profile_completed = False
 
         patient.save()
         return Response({
