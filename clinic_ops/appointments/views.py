@@ -85,7 +85,8 @@ class AppointmentView(APIView):
                 walk_in_insurance_info = request.data.get('insurance_info', '')
 
                 dummy_username = f"walkin_{uuid.uuid4().hex[:8]}"
-                user = User.objects.create(username=dummy_username, first_name=walk_in_name, role='PATIENT')
+                # Use create_user to ensure any default password/hashing is handled correctly
+                user = User.objects.create_user(username=dummy_username, first_name=walk_in_name, role='PATIENT')
                 patient = Patient.objects.create(
                     user=user, 
                     profile_completed=True,
