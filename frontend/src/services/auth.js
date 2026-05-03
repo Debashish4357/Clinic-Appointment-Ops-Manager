@@ -10,6 +10,11 @@ export const registerUser = async (userData) => {
   return response.data;
 };
 
+export const resetPassword = async ({ email, newPassword }) => {
+  const response = await API.post('reset-password/', { email, newPassword });
+  return response.data;
+};
+
 export const logoutUser = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('role');
@@ -18,3 +23,4 @@ export const logoutUser = () => {
 };
 
 export const isAuthenticated = () => !!localStorage.getItem('token');
+

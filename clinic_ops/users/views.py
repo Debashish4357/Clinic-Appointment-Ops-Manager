@@ -23,9 +23,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        print(f"[LOGIN] Attempt for username: {attrs.get('username')}")
         data = super().validate(attrs)
         data['role'] = self.user.role
         data['user_id'] = self.user.id
+        print(f"[LOGIN] Success — user_id={self.user.id}, role={self.user.role}")
         return data
 
 
@@ -56,11 +58,20 @@ class RegisterView(APIView):
         email    = request.data.get('email', '').strip()
         password = request.data.get('password', '')
 
+        print(f"[REGISTER] Request — username={username}, email={email}")
+
         if not username or not password:
+            print("[REGISTER] Failed — missing username or password")
             return Response({'detail': 'username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
+            print(f"[REGISTER] Failed — username '{username}' already taken")
             return Response({'detail': 'Username already taken.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── Email uniqueness check ──────────────────────────────────────────
+        if email and User.objects.filter(email__iexact=email).exists():
+            print(f"[REGISTER] Failed — email '{email}' already exists")
+            return Response({'detail': 'User already exists with this email.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = User.objects.create_user(
@@ -70,9 +81,59 @@ class RegisterView(APIView):
                 password=password,
             )
             Patient.objects.create(user=user)
+            print(f"[REGISTER] Success — created patient user_id={user.id}")
             return Response({'message': 'Patient account created successfully.'}, status=status.HTTP_201_CREATED)
         except Exception as e:
+            print(f"[REGISTER] Exception — {e}")
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ── Reset Password (no email service — direct update) ─────────────────────────
+
+class ResetPasswordView(APIView):
+    """POST /api/reset-password/ — update password by email (no email service)."""
+    permission_classes = []
+
+    def post(self, request):
+        email       = request.data.get('email', '').strip()
+        new_password = request.data.get('newPassword', '').strip()
+
+        print(f"[RESET-PASSWORD] Request — email={email}")
+
+        # ── Input validation ────────────────────────────────────────────────
+        if not email or not new_password:
+            print("[RESET-PASSWORD] Failed — missing email or newPassword")
+            return Response(
+                {'detail': 'email and newPassword are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(new_password) < 6:
+            print("[RESET-PASSWORD] Failed — password too short")
+            return Response(
+                {'detail': 'Password must be at least 6 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ── Find user ──────────────────────────────────────────────────────
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            print(f"[RESET-PASSWORD] Failed — no user found for email={email}")
+            return Response(
+                {'detail': 'No account found with that email address.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # ── Hash & save new password ───────────────────────────────────────
+        user.set_password(new_password)   # uses Django's PBKDF2 / bcrypt hasher
+        user.save()
+        print(f"[RESET-PASSWORD] Success — password updated for user_id={user.id}")
+
+        return Response(
+            {'message': 'Password updated successfully.'},
+            status=status.HTTP_200_OK
+        )
 
 
 # ── Create Receptionist (ADMIN only) ──────────────────────────────────────────

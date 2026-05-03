@@ -4,12 +4,15 @@ const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/',
 });
 
-// Attach JWT token to every request
+// Public endpoints — no Authorization header, no 401 redirect
+const PUBLIC_ENDPOINTS = ['token/', 'register/', 'reset-password/'];
+const isPublic = (url) => PUBLIC_ENDPOINTS.some((e) => url.includes(e));
+
+// Attach JWT token to every request (skip public endpoints)
 API.interceptors.request.use(
   (req) => {
     const token = localStorage.getItem('token');
-    const isAuthEndpoint = req.url.includes('token/') || req.url.includes('register/');
-    if (token && !isAuthEndpoint) {
+    if (token && !isPublic(req.url)) {
       req.headers['Authorization'] = `Bearer ${token}`;
     }
     return req;
@@ -18,13 +21,12 @@ API.interceptors.request.use(
 );
 
 // Handle 401 — token expired or invalid → force re-login
-// Skip redirect if no token existed (i.e. login attempt with bad credentials)
+// Skip redirect for public endpoints (login / register / reset-password)
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    const isAuthEndpoint = error.config && (error.config.url.includes('token/') || error.config.url.includes('register/'));
-
-    if (error.response && error.response.status === 401 && !isAuthEndpoint) {
+    const url = error.config?.url || '';
+    if (error.response?.status === 401 && !isPublic(url)) {
       const token = localStorage.getItem('token');
       if (token) {
         // Token was present but rejected → expired/revoked → clear & redirect
@@ -33,10 +35,10 @@ API.interceptors.response.use(
         localStorage.removeItem('user_id');
         window.location.href = '/';
       }
-      // If no token, the user is on login page → let the error reach catch()
     }
     return Promise.reject(error);
   }
 );
 
 export default API;
+
