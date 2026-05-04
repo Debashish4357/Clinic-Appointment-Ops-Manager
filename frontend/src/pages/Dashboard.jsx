@@ -6,6 +6,7 @@ import DoctorDashboard from '../components/DoctorDashboard';
 import ReceptionistDashboard from '../components/ReceptionistDashboard';
 import AdminDashboard from '../components/AdminDashboard';
 import PatientDashboard from './PatientDashboard'; // NEW: Points to pages/PatientDashboard.jsx
+import SunnyLoader from '../components/SunnyLoader';
 
 export default function Dashboard() {
   const [role, setRole] = useState(null);
@@ -34,11 +35,7 @@ export default function Dashboard() {
   }, [navigate]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-cyan-500 border-t-transparent shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
-      </div>
-    );
+    return <SunnyLoader />;
   }
 
   // Render role-specific dashboard

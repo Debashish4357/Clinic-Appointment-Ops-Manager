@@ -4,6 +4,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Appointments from "./pages/Appointments";
 import ForgotPassword from "./pages/ForgotPassword";
+import StaffManagement from "./pages/StaffManagement";
 
 // Protected route wrapper — redirects to / if no token
 const Protected = ({ children }) => {
@@ -31,6 +32,14 @@ function App() {
           element={
             <Protected>
               <Appointments />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/staff"
+          element={
+            <Protected>
+              <StaffManagement />
             </Protected>
           }
         />

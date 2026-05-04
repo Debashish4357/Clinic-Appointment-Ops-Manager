@@ -216,7 +216,7 @@ const AppointmentBooking = ({ onBookingSuccess }) => {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={loading || fetchLoading}
+                disabled={loading || fetchLoading || !formData.doctor || !formData.patient || !formData.date || !formData.time}
                 className="w-full relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-indigo-500/30 transform hover:-translate-y-0.5"
               >
                 {loading ? (

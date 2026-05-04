@@ -465,3 +465,24 @@ class PatientListView(APIView):
         } for p in patients]
         return Response(data, status=status.HTTP_200_OK)
 
+
+# ── Staff List (ADMIN only) ──────────────────────────────────────────────────────
+
+class StaffListView(APIView):
+    """GET /api/staff/ — list all ADMIN + RECEPTIONIST users."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'ADMIN':
+            return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        staff = User.objects.filter(role__in=['ADMIN', 'RECEPTIONIST']).order_by('-date_joined')
+        data = [{
+            'id': u.id,
+            'username': u.username,
+            'email': u.email or '—',
+            'role': u.role,
+            'is_active': u.is_active,
+            'date_joined': u.date_joined.strftime('%Y-%m-%d'),
+        } for u in staff]
+        return Response({'message': 'Success', 'data': data}, status=status.HTTP_200_OK)

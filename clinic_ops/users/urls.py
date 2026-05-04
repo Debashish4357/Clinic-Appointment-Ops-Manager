@@ -4,7 +4,7 @@ from .views import (
     CustomTokenObtainPairView, RegisterView, ResetPasswordView,
     PatientProfileView, CreateReceptionistView, CreateDoctorView,
     PatientDetailView, DoctorListView, DoctorDetailView,
-    PatientListView, UserProfileView
+    PatientListView, UserProfileView, StaffListView
 )
 
 urlpatterns = [
@@ -20,5 +20,6 @@ urlpatterns = [
     path('doctors/',            DoctorListView.as_view(),            name='doctor_list'),
     path('doctors/<int:pk>/',   DoctorDetailView.as_view(),          name='doctor_detail'),
     path('patients/',           PatientListView.as_view(),           name='patient_list'),
+    path('staff/',              StaffListView.as_view(),             name='staff_list'),
 ]
 
