@@ -191,6 +191,7 @@ class AppointmentView(APIView):
             'data': {
                 'id': appointment.id,
                 'token_number': token_number,
+                'token_display': f"{doctor.doctor_code}-{str(token_number).zfill(2)}",
                 'estimated_wait_time': estimated_wait_time,
                 'date': appt_date,
                 'time': appt_time,
@@ -655,9 +656,12 @@ class DoctorDashboardView(APIView):
         appointments_list = []
         for appt in today_appointments:
             patient_user = appt.patient.user
+            doc_code = appt.doctor.doctor_code or 'DOC'
             appointments_list.append({
                 'id': appt.id,
                 'token_number': appt.token_number,
+                'token_display': f"{doc_code}-{str(appt.token_number).zfill(2)}",
+                'doctor_code': doc_code,
                 'time': str(appt.time),
                 'patient_id': appt.patient.id,
                 'patient_name': patient_user.get_full_name() or patient_user.username,
@@ -740,9 +744,12 @@ class ReceptionistDashboardView(APIView):
         for appt in today_appointments:
             patient_user = appt.patient.user
             doctor_user = appt.doctor.user
+            doc_code = appt.doctor.doctor_code or 'DOC'
             appointments_list.append({
                 'id': appt.id,
                 'token_number': appt.token_number,
+                'token_display': f"{doc_code}-{str(appt.token_number).zfill(2)}",
+                'doctor_code': doc_code,
                 'time': str(appt.time),
                 'patient_id': appt.patient.id,
                 'patient_name': patient_user.get_full_name() or patient_user.username,

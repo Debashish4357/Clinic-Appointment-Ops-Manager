@@ -359,12 +359,14 @@ export default function PatientDashboard() {
           </div>
 
           {/* Profile dropdown */}
-          <ProfileDropdown
-            name={profileName}
-            profileImage={profile.profile_image}
-            onEditProfile={() => setEditProfileOpen(true)}
-            onLogout={handleLogout}
-          />
+          <div className="flex items-center gap-4">
+            <ProfileDropdown
+              name={profileName}
+              profileImage={profile.profile_image}
+              onEditProfile={() => setEditProfileOpen(true)}
+              onLogout={handleLogout}
+            />
+          </div>
         </div>
       </nav>
 

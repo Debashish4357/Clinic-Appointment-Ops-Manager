@@ -3,9 +3,11 @@ from .models import Appointment, LabReport
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    doctor_name  = serializers.SerializerMethodField()
-    patient_name = serializers.SerializerMethodField()
-    contact      = serializers.SerializerMethodField()  # Fix 5: QueuePage searches by contact
+    doctor_name   = serializers.SerializerMethodField()
+    patient_name  = serializers.SerializerMethodField()
+    contact       = serializers.SerializerMethodField()  # for QueuePage search by contact
+    token_display = serializers.SerializerMethodField()  # composite token e.g. VIR-01
+    doctor_code   = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -31,6 +33,20 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return obj.patient.contact or ''
         except Exception:
             return ''
+
+    def get_token_display(self, obj):
+        try:
+            code = obj.doctor.doctor_code or 'DOC'
+            return f"{code}-{str(obj.token_number).zfill(2)}"
+        except Exception:
+            return str(obj.token_number)
+
+    def get_doctor_code(self, obj):
+        try:
+            return obj.doctor.doctor_code or ''
+        except Exception:
+            return ''
+
 
 class LabReportSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()

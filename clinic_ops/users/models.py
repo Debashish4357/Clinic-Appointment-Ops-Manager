@@ -12,11 +12,12 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, blank=True, null=True, default=None)
 
     def save(self, *args, **kwargs):
-        # Normalize email: lowercase + strip; store None if blank (avoids unique constraint on empty strings)
         if self.email:
-            self.email = self.email.lower().strip() or None
+            self.email = self.email.lower().strip()
         else:
-            self.email = None
+            # Generate a unique dummy email to avoid NOT NULL and UNIQUE constraint failures
+            # if the user hasn't applied the alter_email migration yet.
+            self.email = f"{self.username}@noemail.local".lower()
         # Superusers created via createsuperuser / admin always become ADMIN
         if self.is_superuser:
             self.role = self.Role.ADMIN
@@ -32,6 +33,30 @@ class Doctor(models.Model):
     consultation_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
     avg_consultation_time = models.PositiveIntegerField(default=15, help_text='Average consultation time in minutes')
     is_available = models.BooleanField(default=False)
+    doctor_code = models.CharField(max_length=5, unique=True, blank=True, help_text='Short unique code used in composite tokens (e.g. VIR, KIR)')
+
+    def _generate_unique_code(self):
+        """Generate a short, uppercase, unique code from the doctor's name."""
+        name = self.user.get_full_name() or self.user.username
+        # Remove 'Dr.' prefix if present, strip spaces
+        name = name.replace('Dr.', '').replace('Dr ', '').strip()
+        # Take up to first 3 letters of first name
+        base = ''.join(c for c in name if c.isalpha())[:3].upper()
+        if not base:
+            base = 'DOC'
+        # Ensure uniqueness
+        candidate = base
+        counter = 1
+        qs = Doctor.objects.exclude(pk=self.pk)
+        while qs.filter(doctor_code=candidate).exists():
+            candidate = f"{base}{counter}"
+            counter += 1
+        return candidate
+
+    def save(self, *args, **kwargs):
+        if not self.doctor_code:
+            self.doctor_code = self._generate_unique_code()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Dr. {self.user.get_full_name() or self.user.username}"

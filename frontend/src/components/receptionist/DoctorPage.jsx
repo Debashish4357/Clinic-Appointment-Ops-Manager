@@ -15,8 +15,8 @@ export default function DoctorPage() {
   const [showForm, setShowForm] = useState(false);
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [saving,   setSaving]   = useState(false);
+  const [toggling, setToggling] = useState({});
   const [msg,      setMsg]      = useState(null);
-  const [toggling, setToggling] = useState(null);
 
   const loadDoctors = () => {
     setLoading(true);
@@ -27,6 +27,18 @@ export default function DoctorPage() {
   };
 
   useEffect(loadDoctors, []);
+
+  const toggleAvailability = async (id, currentStatus) => {
+    setToggling(prev => ({ ...prev, [id]: true }));
+    try {
+      await API.patch(`doctors/${id}/`, { is_available: !currentStatus });
+      setDoctors(prev => prev.map(d => d.id === id ? { ...d, is_available: !currentStatus } : d));
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Failed to update availability.' });
+    } finally {
+      setToggling(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   /* ── Create doctor ─────────────────────────────────────────────── */
   const handleCreate = async (e) => {
@@ -41,17 +53,6 @@ export default function DoctorPage() {
     } catch (err) {
       setMsg({ type: 'error', text: err?.response?.data?.message || 'Failed to create doctor.' });
     } finally { setSaving(false); }
-  };
-
-  /* ── Toggle availability ───────────────────────────────────────── */
-  const toggleAvailability = async (doctor) => {
-    setToggling(doctor.id);
-    try {
-      await API.patch(`doctors/${doctor.id}/`, { is_available: !doctor.is_available });
-      loadDoctors();
-    } catch {
-      alert('Could not update availability.');
-    } finally { setToggling(null); }
   };
 
   return (
@@ -146,7 +147,7 @@ export default function DoctorPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 bg-slate-800/60">
-                  {['Doctor', 'Specialization', 'Fee (₹)', 'Avg Time', 'Availability'].map(h => (
+                  {['Doctor', 'Code', 'Specialization', 'Fee (₹)', 'Avg Time', 'Status', 'Availability'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">
                       {h}
                     </th>
@@ -155,33 +156,87 @@ export default function DoctorPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {doctors.map(doc => (
-                  <tr key={doc.id} className="hover:bg-white/5 transition-colors">
+                  <tr key={doc.id} className={`transition-colors group ${
+                    doc.is_available ? 'hover:bg-white/5' : 'opacity-60 hover:opacity-80 hover:bg-white/5'
+                  }`}>
+                    {/* Doctor name + avatar */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-xs font-black">
+                        <div className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-black shadow-md transition-all ${
+                          doc.is_available ? 'bg-gradient-to-br from-blue-600 to-cyan-500 shadow-cyan-500/20' : 'bg-slate-700'
+                        }`}>
                           {doc.name?.[0]?.toUpperCase() || 'D'}
                         </div>
                         <span className="font-semibold text-white">{doc.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-300">{doc.specialization || '—'}</td>
-                    <td className="px-4 py-3 text-slate-300">{doc.consultation_fee ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-300">{doc.avg_consultation_time ? `${doc.avg_consultation_time} min` : '—'}</td>
+
+                    {/* Doctor code */}
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => toggleAvailability(doc)}
-                        disabled={toggling === doc.id}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
-                          doc.is_available ? 'bg-emerald-500' : 'bg-slate-600'
-                        }`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                          doc.is_available ? 'translate-x-6' : 'translate-x-1'
+                      {doc.doctor_code
+                        ? <span className="font-mono text-xs font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-md">{doc.doctor_code}</span>
+                        : <span className="text-slate-600">—</span>}
+                    </td>
+
+                    {/* Specialization */}
+                    <td className="px-4 py-3 text-slate-300">{doc.specialization || '—'}</td>
+
+                    {/* Fee */}
+                    <td className="px-4 py-3 text-slate-300">
+                      {doc.consultation_fee ? `₹${doc.consultation_fee}` : '—'}
+                    </td>
+
+                    {/* Avg time */}
+                    <td className="px-4 py-3 text-slate-300">
+                      {doc.avg_consultation_time ? `${doc.avg_consultation_time} min` : '—'}
+                    </td>
+
+                    {/* Status badge with pulsing dot */}
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        doc.is_available
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-slate-700/50 text-slate-500 border border-slate-600/40'
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          doc.is_available ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
                         }`} />
-                      </button>
-                      <span className={`ml-2 text-xs font-semibold ${doc.is_available ? 'text-emerald-400' : 'text-slate-500'}`}>
                         {doc.is_available ? 'Active' : 'Inactive'}
                       </span>
+                    </td>
+
+                    {/* Toggle switch */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {/* Toggle pill */}
+                        <button
+                          onClick={() => toggleAvailability(doc.id, doc.is_available)}
+                          disabled={toggling[doc.id]}
+                          title={doc.is_available ? 'Click to deactivate' : 'Click to activate'}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed ${
+                            doc.is_available
+                              ? 'border-emerald-500/60 bg-emerald-500'
+                              : 'border-slate-600 bg-slate-700'
+                          }`}
+                        >
+                          <span className={`inline-flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-md transition-all duration-300 ${
+                            doc.is_available ? 'translate-x-5' : 'translate-x-0.5'
+                          }`}>
+                            {toggling[doc.id] && (
+                              <svg className="h-2.5 w-2.5 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                            )}
+                          </span>
+                        </button>
+                        {/* Text label */}
+                        <span className={`text-xs font-semibold select-none ${
+                          doc.is_available ? 'text-emerald-400' : 'text-slate-500'
+                        }`}>
+                          {toggling[doc.id] ? '…' : doc.is_available ? 'On' : 'Off'}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))}

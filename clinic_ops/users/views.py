@@ -168,16 +168,21 @@ class CreateReceptionistView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        User.objects.create_user(
-            username=username,
-            role='RECEPTIONIST',
-            password=password,
-        )
-
-        return Response(
-            {'message': f'Receptionist "{username}" created successfully.'},
-            status=status.HTTP_201_CREATED
-        )
+        try:
+            User.objects.create_user(
+                username=username,
+                role='RECEPTIONIST',
+                password=password,
+            )
+            return Response(
+                {'message': f'Receptionist "{username}" created successfully.'},
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {'message': f'Error creating receptionist: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # ── Create Doctor (RECEPTIONIST only) ────────────────────────────────────────
@@ -431,7 +436,8 @@ class DoctorListView(APIView):
             'specialization': d.specialization,
             'consultation_fee': str(d.consultation_fee),
             'avg_consultation_time': d.avg_consultation_time,
-            'is_available': d.is_available
+            'is_available': d.is_available,
+            'doctor_code': d.doctor_code,
         } for d in doctors]
         return Response(data, status=status.HTTP_200_OK)
 
@@ -443,15 +449,23 @@ class DoctorDetailView(APIView):
             return Response({'message': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
         
         try:
-            doctor = Doctor.objects.get(pk=pk)
+            doctor = Doctor.objects.select_related('user').get(pk=pk)
         except Doctor.DoesNotExist:
             return Response({'message': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         if 'is_available' in request.data:
-            doctor.is_available = request.data['is_available']
+            doctor.is_available = bool(request.data['is_available'])
         
         doctor.save()
-        return Response({'message': 'Doctor updated successfully.'}, status=status.HTTP_200_OK)
+        return Response({
+            'message': 'Doctor availability updated successfully.',
+            'data': {
+                'id': doctor.id,
+                'name': f"Dr. {doctor.user.get_full_name() or doctor.user.username}",
+                'is_available': doctor.is_available,
+                'doctor_code': doctor.doctor_code,
+            }
+        }, status=status.HTTP_200_OK)
 
 class PatientListView(APIView):
     permission_classes = [IsAuthenticated]

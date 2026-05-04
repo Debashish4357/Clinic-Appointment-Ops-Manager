@@ -7,15 +7,16 @@ import AppointmentBooking from '../components/AppointmentBooking';
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const styles = {
-    BOOKED:    'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    ARRIVED:   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    COMPLETED: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    CANCELLED: 'bg-red-500/20 text-red-300 border-red-500/30',
-    NO_SHOW:   'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    BOOKED:      'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    ARRIVED:     'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    IN_PROGRESS: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+    COMPLETED:   'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    CANCELLED:   'bg-red-500/20 text-red-300 border-red-500/30',
+    NO_SHOW:     'bg-amber-500/20 text-amber-300 border-amber-500/30',
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${styles[status] || 'bg-slate-600/40 text-slate-300 border-slate-600'}`}>
-      {status || 'UNKNOWN'}
+      {status?.replace('_', ' ') || 'UNKNOWN'}
     </span>
   );
 };
@@ -529,8 +530,8 @@ export default function Appointments() {
                           {filtered.map((appt, i) => (
                             <tr key={appt.id ?? i} className="hover:bg-white/5 transition-colors">
                               <td className="px-4 py-3">
-                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20 text-blue-300 text-xs font-black">
-                                  {appt.token_number || '—'}
+                                <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20 tracking-wider whitespace-nowrap">
+                                  {appt.token_display || appt.token_number || '—'}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-slate-300 font-medium">

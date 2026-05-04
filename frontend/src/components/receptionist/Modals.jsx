@@ -18,11 +18,13 @@ export function BookingModal({ open, onClose, onSuccess }) {
   const [form,      setForm]      = useState({ doctor: '', patient: '', date: todayStr(), time: '' });
 
   useEffect(() => {
-    if (!open || doctors.length) return;
+    if (!open) return;
     setFetching(true);
     Promise.all([API.get('doctors/'), API.get('patients/')])
       .then(([dRes, pRes]) => {
-        setDoctors(dRes.data || []);
+        // Only show ACTIVE doctors in booking dropdown
+        const allDoctors = dRes.data || [];
+        setDoctors(allDoctors.filter(d => d.is_available));
         setPatients(pRes.data || []);
       })
       .catch(() => setError('Failed to load doctors / patients.'))
@@ -127,9 +129,16 @@ export function WalkInModal({ open, onClose, onSuccess }) {
   });
 
   useEffect(() => {
-    if (!open || doctors.length) return;
+    if (!open) return;
     setFetching(true);
-    API.get('doctors/').then(r => setDoctors(r.data || [])).catch(() => {}).finally(() => setFetching(false));
+    API.get('doctors/')
+      .then(r => {
+        // Only show ACTIVE doctors
+        const allDoctors = r.data || [];
+        setDoctors(allDoctors.filter(d => d.is_available));
+      })
+      .catch(() => {})
+      .finally(() => setFetching(false));
   }, [open]);
 
   useEffect(() => {

@@ -34,12 +34,16 @@ export default function BookingModal({ open, onClose, onSuccess, prefill = null 
     }
   }, [open, prefill]);
 
-  // Fetch doctors once
+  // Fetch doctors each time modal opens — always fresh to reflect availability changes
   useEffect(() => {
-    if (!open || doctors.length) return;
+    if (!open) return;
     setFetching(true);
     API.get('doctors/')
-      .then(r => setDoctors(r.data || []))
+      .then(r => {
+        // Only show ACTIVE doctors in booking step
+        const all = r.data || [];
+        setDoctors(all.filter(d => d.is_available));
+      })
       .catch(() => {})
       .finally(() => setFetching(false));
   }, [open]);
@@ -136,7 +140,11 @@ export default function BookingModal({ open, onClose, onSuccess, prefill = null 
                   {[1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-slate-800 animate-pulse" />)}
                 </div>
               ) : doctors.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No doctors available.</p>
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-6 text-center">
+                  <p className="text-2xl mb-2">🏥</p>
+                  <p className="text-sm font-semibold text-amber-400">No doctors currently available</p>
+                  <p className="text-xs text-slate-500 mt-1">All doctors are inactive. Please try again later or contact the clinic.</p>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {doctors.map(d => {
