@@ -15,6 +15,7 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
 
@@ -22,6 +23,7 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
     if (open) {
       setForm(profile || {});
       setErr('');
+      setSuccessMsg('');
       setImageFile(null);
       setImagePreview(profile?.profile_image || null);
     }
@@ -30,6 +32,13 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
   if (!open) return null;
 
   const iCls = 'w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm text-white focus:border-cyan-500 focus:outline-none';
+
+  const requiredFields = ['age', 'contact', 'blood_group', 'gender', 'address'];
+  const isFormValid = requiredFields.every(k => {
+    const val = form[k];
+    if (typeof val === 'string') return val.trim().length > 0;
+    return val !== null && val !== undefined;
+  });
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -42,7 +51,12 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
   };
 
   const handleSave = async () => {
-    setSaving(true); setErr('');
+    if (!isFormValid) {
+      setErr('Please fill all required fields');
+      return;
+    }
+    
+    setSaving(true); setErr(''); setSuccessMsg('');
     try {
       const fd = new FormData();
       Object.keys(form).forEach(k => {
@@ -63,13 +77,14 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      // If we are forcing them to complete profile, show a nice message
-      if (profile.profile_completed === false) {
-        alert("Profile completed! You can now book appointments.");
-      }
-
-      onSaved?.();
-      onClose();
+      setSuccessMsg('Profile saved successfully!');
+      
+      // Delay closing to let user see the success message
+      setTimeout(() => {
+        onSaved?.();
+        onClose();
+      }, 1000);
+      
     } catch (e) {
       setErr(e?.response?.data?.message || 'Save failed. Please check your inputs (Age and 10-digit Contact are required).');
     } finally { setSaving(false); }
@@ -86,6 +101,12 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
         </div>
         <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
           {err && <div className="text-sm text-red-400 bg-red-500/10 rounded-xl px-4 py-2">{err}</div>}
+          {successMsg && <div className="text-sm text-emerald-400 bg-emerald-500/10 rounded-xl px-4 py-2">{successMsg}</div>}
+          {!isFormValid && !err && !successMsg && (
+             <div className="text-xs text-amber-400/80 bg-amber-500/10 rounded-xl px-4 py-2">
+               Please fill all required fields (*).
+             </div>
+          )}
 
           {/* Profile Picture Upload */}
           <div className="flex flex-col items-center gap-3">
@@ -107,11 +128,11 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              ['Age', 'age', 'number', '28'],
-              ['Contact', 'contact', 'text', '9876543210'],
+              ['Age *', 'age', 'number', '28'],
+              ['Contact *', 'contact', 'text', '9876543210'],
               ['Emergency Contact', 'emergency_contact', 'text', '9876543211'],
-              ['Blood Group', 'blood_group', 'select', ['A+','A-','B+','B-','O+','O-','AB+','AB-']],
-              ['Gender', 'gender', 'select', [['MALE','Male'],['FEMALE','Female'],['OTHER','Other']]],
+              ['Blood Group *', 'blood_group', 'select', ['A+','A-','B+','B-','O+','O-','AB+','AB-']],
+              ['Gender *', 'gender', 'select', [['MALE','Male'],['FEMALE','Female'],['OTHER','Other']]],
             ].map(([label, key, type, options]) => (
               <div key={key}>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</label>
@@ -132,7 +153,7 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
 
           {/* Full width fields */}
           {[
-            ['Address', 'address', 'text', '123 Main St, City'],
+            ['Address *', 'address', 'text', '123 Main St, City'],
             ['Medical History', 'medical_history', 'textarea', 'Records of past illnesses, surgeries, and family medical background.'],
             ['Allergies', 'allergies', 'textarea', 'Known sensitivities to medications or food.'],
             ['Current Medications', 'current_medication', 'textarea', 'A list of active prescriptions and dosages.'],
@@ -155,7 +176,7 @@ function EditProfileModal({ open, profile, onClose, onSaved }) {
           <button onClick={onClose} className="flex-1 rounded-xl border border-white/10 bg-slate-800 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving}
+          <button onClick={handleSave} disabled={saving || !isFormValid}
             className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 py-2.5 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 transition shadow-lg shadow-cyan-500/20 active:scale-95">
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
@@ -285,9 +306,10 @@ export default function PatientDashboard() {
       setAppointments(data.patients_appointments || data.appointments || []);
       setLabReports(data.lab_reports || []);
 
-      // NEW: Force open profile if not completed
-      if (prof.profile_completed === false) {
+      // NEW: Force open profile if not completed, but only once per session
+      if (prof.profile_completed === false && !sessionStorage.getItem('profilePrompted')) {
         setEditProfileOpen(true);
+        sessionStorage.setItem('profilePrompted', 'true');
       }
     } catch {
       setError('Failed to load dashboard data. Please refresh.');

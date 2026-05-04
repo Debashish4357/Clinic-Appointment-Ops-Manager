@@ -154,7 +154,7 @@ export default function Signup() {
             {/* Email (optional but used for reset-password) */}
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                Email <span className="text-slate-600 normal-case font-normal">(for password reset)</span>
+                Email
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-500">

@@ -121,8 +121,8 @@ class ResetPasswordView(APIView):
         except User.DoesNotExist:
             print(f"[RESET-PASSWORD] Failed — no user found for email={email}")
             return Response(
-                {'detail': 'No account found with that email address.'},
-                status=status.HTTP_404_NOT_FOUND
+                {'detail': 'User not found with this email.'},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         # ── Hash & save new password ───────────────────────────────────────
