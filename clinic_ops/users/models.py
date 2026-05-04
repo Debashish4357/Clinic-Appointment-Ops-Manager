@@ -9,8 +9,14 @@ class User(AbstractUser):
         PATIENT = 'PATIENT', 'Patient'
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.PATIENT)
+    email = models.EmailField(unique=True, blank=True, null=True, default=None)
 
     def save(self, *args, **kwargs):
+        # Normalize email: lowercase + strip; store None if blank (avoids unique constraint on empty strings)
+        if self.email:
+            self.email = self.email.lower().strip() or None
+        else:
+            self.email = None
         # Superusers created via createsuperuser / admin always become ADMIN
         if self.is_superuser:
             self.role = self.Role.ADMIN

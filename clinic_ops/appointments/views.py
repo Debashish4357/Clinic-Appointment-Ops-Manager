@@ -298,7 +298,7 @@ class AppointmentDetailView(APIView):
 
         # ── ADMIN: Any valid transition ────────────────────────────────────────
         elif role == 'ADMIN':
-            valid_statuses = ['BOOKED', 'ARRIVED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
+            valid_statuses = ['BOOKED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW']
             if new_status:
                 if new_status not in valid_statuses:
                     return Response(
