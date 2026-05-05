@@ -38,10 +38,11 @@ export default function BookingModal({ open, onClose, onSuccess, prefill = null 
   useEffect(() => {
     if (!open) return;
     setFetching(true);
-    API.get('doctors/')
+    API.get('doctors/available/')
       .then(r => {
         // Only show ACTIVE doctors in booking step
         const all = r.data || [];
+        // The API might already filter, but we double check here
         setDoctors(all.filter(d => d.is_available));
       })
       .catch(() => {})
@@ -87,15 +88,9 @@ export default function BookingModal({ open, onClose, onSuccess, prefill = null 
         time: form.time, reason: form.reason,
         appointment_type: form.visitType,
       };
-      console.log("=== FRONTEND REQUEST ===");
-      console.log("POST /api/appointments/", payload);
-      
       await API.post('appointments/', payload);
-      console.log("Booking successful!");
-      alert("Appointment booked successfully!");
       onSuccess?.(); onClose();
     } catch (err) {
-      console.error("Booking failed:", err?.response?.data);
       setError(err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail || 'Booking failed. Try again.');
     } finally { setLoading(false); }
   };

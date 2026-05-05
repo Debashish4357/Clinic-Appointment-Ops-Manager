@@ -21,6 +21,11 @@ A comprehensive Clinic Management System designed to streamline patient workflow
 - **Booking:** Select doctors and time slots.
 - **Visit History:** View past prescriptions and doctor feedback.
 
+### 🛡️ System Stability & Concurrency
+- **Atomic Transactions:** Backend uses `transaction.atomic()` and `select_for_update()` to prevent race conditions during concurrent bookings.
+- **Data Integrity:** Enforced role-based access control (RBAC) and strict field validation.
+- **Smart Logic:** Dynamic wait time calculations and auto-token generation.
+
 ---
 
 ## 🛠️ Tech Stack

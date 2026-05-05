@@ -110,6 +110,7 @@ export default function ReceptionistDashboard() {
           onBooking={() => setBookingOpen(true)}
           onWalkIn={() => setWalkInOpen(true)}
           loadingAppts={refreshing}
+          showToast={showToast}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
         />

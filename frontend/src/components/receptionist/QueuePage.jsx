@@ -55,7 +55,7 @@ function ActionBtn({ label, color, onClick, disabled }) {
   );
 }
 
-export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn, loadingAppts, selectedDate, onDateChange }) {
+export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn, loadingAppts, selectedDate, onDateChange, showToast }) {
   const [filter,    setFilter]    = useState('Active');
   const [search,    setSearch]    = useState('');
   const [updating,  setUpdating]  = useState(null);
@@ -124,28 +124,28 @@ export default function QueuePage({ appointments, onRefresh, onBooking, onWalkIn
   const updateStatus = async (id, status) => {
     setUpdating(id);
     try { await API.patch(`appointments/${id}/`, { status }); onRefresh(true); }
-    catch (err) { alert(err?.response?.data?.message || 'Action failed.'); }
+    catch (err) { showToast?.(err?.response?.data?.message || 'Action failed.', 'error'); }
     finally { setUpdating(null); }
   };
 
   const moveQueue = async (id, action) => {
     setUpdating(id);
     try { await API.patch(`appointments/${id}/move/`, { action }); onRefresh(true); }
-    catch (err) { alert(err?.response?.data?.message || 'Move failed.'); }
+    catch (err) { showToast?.(err?.response?.data?.message || 'Move failed.', 'error'); }
     finally { setUpdating(null); }
   };
 
   const adjustWait = async (id, change) => {
     setUpdating(id);
     try { await API.patch(`appointments/${id}/wait-time/`, { change }); onRefresh(true); }
-    catch { alert('Failed to update wait time.'); }
+    catch { showToast?.('Failed to update wait time.', 'error'); }
     finally { setUpdating(null); }
   };
 
   const fetchPatient = async (patientId) => {
     setFetchingPt(true);
     try { const r = await API.get(`patient/${patientId}/details/`); setPatientModal(r.data); }
-    catch { alert('Failed to load patient.'); }
+    catch { showToast?.('Failed to load patient.', 'error'); }
     finally { setFetchingPt(false); }
   };
 

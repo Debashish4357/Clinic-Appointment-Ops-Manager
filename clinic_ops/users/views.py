@@ -185,16 +185,16 @@ class CreateReceptionistView(APIView):
             )
 
 
-# ── Create Doctor (RECEPTIONIST only) ────────────────────────────────────────
+# ── Create Doctor (ADMIN or RECEPTIONIST only) ────────────────────────────────
 
 class CreateDoctorView(APIView):
-    """POST /api/create-doctor/ — RECEPTIONIST creates a doctor account."""
+    """POST /api/create-doctor/ — RECEPTIONIST or ADMIN creates a doctor account."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if request.user.role != 'RECEPTIONIST':
+        if request.user.role not in ['RECEPTIONIST', 'ADMIN']:
             return Response(
-                {'message': 'Only receptionists can create doctor accounts.'},
+                {'message': 'Only receptionists or admins can create doctor accounts.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 

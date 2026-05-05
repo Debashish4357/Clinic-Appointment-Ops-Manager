@@ -36,7 +36,7 @@ function PrescriptionsTab({ appointments }) {
         <PrescriptionCard
           key={a.id}
           appt={a}
-          onDownload={() => console.log('Download PDF for appointment', a.id)}
+          onDownload={() => {}}
         />
       ))}
     </div>

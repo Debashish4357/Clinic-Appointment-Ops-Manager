@@ -74,7 +74,7 @@ function PastCard({ appt }) {
           </button>
         )}
         <button
-          onClick={() => console.log('Download PDF for appointment', appt.id)}
+
           className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-400 transition hover:bg-cyan-500/20"
         >
           Download PDF

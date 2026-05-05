@@ -11,7 +11,7 @@ from .views import (
 
 urlpatterns = [
     # Doctors list (for booking dropdown)
-    path('doctors/', DoctorListView.as_view(), name='doctors_list'),
+    path('doctors/available/', DoctorListView.as_view(), name='doctors_available_list'),
 
     # Appointments CRUD
     path('appointments/', AppointmentView.as_view(), name='appointments'),

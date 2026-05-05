@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 from django.utils.dateparse import parse_date, parse_time
 from django.db.models import Count, Sum
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -159,30 +160,41 @@ class AppointmentView(APIView):
         except Doctor.DoesNotExist:
             return Response({'message': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if Appointment.objects.filter(doctor=doctor, date=appt_date, time=appt_time).exclude(status='CANCELLED').exists():
+        try:
+            with transaction.atomic():
+                # Lock the doctor row to prevent concurrent token generation
+                locked_doctor = Doctor.objects.select_for_update().get(id=doctor_id)
+
+                if Appointment.objects.filter(doctor=locked_doctor, date=appt_date, time=appt_time).exclude(status='CANCELLED').exists():
+                    return Response(
+                        {'message': 'Time slot already booked'},
+                        status=status.HTTP_409_CONFLICT
+                    )
+
+                # Auto-generate token and wait time
+                appointments_today = Appointment.objects.filter(
+                    doctor=locked_doctor, date=appt_date
+                ).exclude(status='CANCELLED').count()
+                token_number       = appointments_today + 1
+                estimated_wait_time = token_number * locked_doctor.avg_consultation_time
+
+                appointment = Appointment.objects.create(
+                    patient=patient,
+                    doctor=locked_doctor,
+                    date=appt_date,
+                    time=appt_time,
+                    token_number=token_number,
+                    estimated_wait_time=estimated_wait_time,
+                    fee=locked_doctor.consultation_fee,
+                    reason=reason,
+                    appointment_type=appointment_type,
+                )
+        except Exception as e:
+            print("Error creating appointment:", e)
             return Response(
-                {'message': 'Time slot already booked'},
-                status=status.HTTP_409_CONFLICT
+                {'message': 'Error creating appointment. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-        # Auto-generate token and wait time
-        appointments_today = Appointment.objects.filter(
-            doctor=doctor, date=appt_date
-        ).exclude(status='CANCELLED').count()
-        token_number       = appointments_today + 1
-        estimated_wait_time = token_number * doctor.avg_consultation_time
-
-        appointment = Appointment.objects.create(
-            patient=patient,
-            doctor=doctor,
-            date=appt_date,
-            time=appt_time,
-            token_number=token_number,
-            estimated_wait_time=estimated_wait_time,
-            fee=doctor.consultation_fee,
-            reason=reason,
-            appointment_type=appointment_type,
-        )
         print("=== DB SAVE RESULT ===")
         print(f"Appointment created: ID={appointment.id}, Status={appointment.status}, Token={token_number}")
 
@@ -565,7 +577,7 @@ class DoctorListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        doctors = Doctor.objects.select_related('user').all()
+        doctors = Doctor.objects.select_related('user').filter(is_available=True)
         data = [
             {
                 'id': doc.id,
@@ -692,11 +704,22 @@ class DoctorDashboardView(APIView):
         ).aggregate(total=Sum('fee'))['total'] or 0.00
 
         # ── Smart Queue ────────────────────────────────────────────────────────
-        # Active queue: BOOKED or ARRIVED, ordered by token_number
-        active_queue = [a for a in appointments_list if a['status'] in ['BOOKED', 'ARRIVED']]
-        now_serving = active_queue[0] if active_queue else None
-        next_patient = active_queue[1] if len(active_queue) > 1 else None
-        waiting_count = len(active_queue)
+        # Active queue: IN_PROGRESS, ARRIVED, or BOOKED, ordered by token_number
+        active_queue = [a for a in appointments_list if a['status'] in ['IN_PROGRESS', 'ARRIVED', 'BOOKED']]
+        
+        # Now serving should ideally be the one IN_PROGRESS, or the first in active_queue
+        in_progress = [a for a in active_queue if a['status'] == 'IN_PROGRESS']
+        
+        if in_progress:
+            now_serving = in_progress[0]
+            # Next patient is the first one after the in_progress one in the active_queue that is not in_progress
+            remaining = [a for a in active_queue if a['status'] != 'IN_PROGRESS']
+            next_patient = remaining[0] if remaining else None
+        else:
+            now_serving = active_queue[0] if active_queue else None
+            next_patient = active_queue[1] if len(active_queue) > 1 else None
+            
+        waiting_count = len([a for a in active_queue if a['status'] != 'IN_PROGRESS'])
 
         data = {
             'appointments': appointments_list,

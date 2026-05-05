@@ -194,7 +194,7 @@ export default function DoctorDashboard() {
       setPrescModal(null);
       fetchData(true);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save prescription.');
+      console.error(err.response?.data?.message || 'Failed to save prescription.');
     } finally {
       setPrescSaving(false);
     }
@@ -207,7 +207,7 @@ export default function DoctorDashboard() {
       await API.patch(`appointments/${id}/wait-time/`, { change });
       fetchData(true);
     } catch {
-      alert('Failed to update wait time.');
+      console.error('Failed to update wait time.');
     } finally {
       setUpdating(null);
     }
@@ -220,7 +220,7 @@ export default function DoctorDashboard() {
       const res = await API.get(`patient/${patientId}/details/`);
       setPatientModal(res.data);
     } catch {
-      alert('Failed to load patient details.');
+      console.error('Failed to load patient details.');
     } finally {
       setFetchingPatient(false);
     }
