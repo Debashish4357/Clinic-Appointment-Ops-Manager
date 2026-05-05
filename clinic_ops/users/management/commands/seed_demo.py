@@ -3,7 +3,7 @@ import random
 from datetime import date, time, timedelta
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import transaction, connection
 from users.models import Doctor, Patient
 from appointments.models import Appointment
 
@@ -13,17 +13,21 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
         
-        # 1. Idempotency Check: Skip if data already exists to avoid race conditions during rolling deploys
-        if Doctor.objects.exists() and Appointment.objects.exists():
-            self.stdout.write(self.style.SUCCESS("Database already contains demo data. Skipping seeding."))
-            return
-
-        self.stdout.write("Starting massive 7-day demo data generation...")
-
-        # 2. Wrap everything in a single transaction
-        # This ensures that either the whole demo is created or nothing is,
-        # and prevents other concurrent processes from seeing a partially deleted state.
+        # 1. Postgres Advisory Lock: This is the most robust way to prevent concurrent execution on Render.
+        # It ensures that even if multiple containers start at once (e.g. during a rolling deploy),
+        # they will wait for each other. The lock is automatically released when the transaction ends.
         with transaction.atomic():
+            with connection.cursor() as cursor:
+                # 123456789 is a random unique 64-bit integer for this specific lock
+                cursor.execute("SELECT pg_advisory_xact_lock(123456789);")
+
+            # 2. Idempotency Check: Skip if data already exists to avoid redundant seeding
+            if Doctor.objects.exists() and Appointment.objects.exists():
+                self.stdout.write(self.style.SUCCESS("Database already contains demo data. Skipping seeding."))
+                return
+
+            self.stdout.write("Starting massive 7-day demo data generation...")
+
             # -- CLEANUP --
             Appointment.objects.all().delete()
             Doctor.objects.all().delete()
@@ -144,5 +148,7 @@ class Command(BaseCommand):
         self.stdout.write("\nDEMO ACCESS:")
         self.stdout.write(f"  ADMIN:  admin_user / Admin@1234")
         self.stdout.write(f"  RECEPTIONIST: receptionist_riya / Recept@1234")
-        self.stdout.write(f"  DOCTOR: {doctors[0].user.username} / Doctor@1234")
-        self.stdout.write(f"  PATIENT: {patients[0].user.username} / Patient@1234")
+        if doctors:
+            self.stdout.write(f"  DOCTOR: {doctors[0].user.username} / Doctor@1234")
+        if patients:
+            self.stdout.write(f"  PATIENT: {patients[0].user.username} / Patient@1234")
